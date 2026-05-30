@@ -1,0 +1,1292 @@
+{
+  "bazar_e_limpeza": {
+    "subcategorias": {
+      "limpeza_geral": {
+        "essencial": true,
+        "produtos": [
+          "detergente liquido",
+          "detergente neutro",
+          "sabao em po",
+          "sabao liquido",
+          "sabao em barra",
+          "desinfetante",
+          "agua sanitaria",
+          "alvejante sem cloro",
+          "limpador multiuso",
+          "limpa piso",
+          "limpa vidro",
+          "limpa banheiro",
+          "limpa cozinha",
+          "desengordurante",
+          "removedor de manchas",
+          "limpador perfumado",
+          "limpador concentrado",
+          "limpador antibacteriano"
+        ]
+      },
+      "lavanderia": {
+        "essencial": true,
+        "produtos": [
+          "amaciante",
+          "amaciante concentrado",
+          "tira manchas",
+          "sabao liquido roupas finas",
+          "sabao para roupas escuras",
+          "sabao para roupas claras",
+          "sabao para roupas de bebe",
+          "reforcador de lavagem",
+          "pastilha para maquina de lavar",
+          "perfume para roupas",
+          "lenços captura cor",
+          "alvejante roupas brancas"
+        ]
+      },
+      "utensilios_limpeza": {
+        "essencial": true,
+        "produtos": [
+          "esponja de cozinha",
+          "esponja dupla face",
+          "esponja de aco",
+          "pano de prato",
+          "pano de chao",
+          "flanela",
+          "mop",
+          "refil mop",
+          "vassoura",
+          "vassoura multiuso",
+          "rodo",
+          "rodo de pia",
+          "balde",
+          "balde com espremedor",
+          "escova de limpeza",
+          "escova de banheiro",
+          "escova de roupa",
+          "luvas de limpeza",
+          "luvas descartaveis",
+          "borrifador",
+          "pulverizador",
+          "pazinha de lixo"
+        ]
+      },
+      "descartaveis": {
+        "essencial": true,
+        "produtos": [
+          "papel higienico",
+          "papel toalha",
+          "guardanapo",
+          "lenço de papel",
+          "toalha umedecida",
+          "saco de lixo pequeno",
+          "saco de lixo medio",
+          "saco de lixo grande",
+          "saco de lixo reforcado",
+          "saco para freezer",
+          "filme plastico",
+          "papel aluminio",
+          "papel manteiga",
+          "copo descartavel",
+          "prato descartavel",
+          "talher descartavel"
+        ]
+      },
+      "odorizacao": {
+        "essencial": false,
+        "produtos": [
+          "odorizador de ambiente",
+          "bom ar spray",
+          "difusor de ambiente",
+          "refil difusor",
+          "vela aromatica",
+          "incenso",
+          "neutralizador de odores",
+          "odorizador sanitario",
+          "pedra sanitaria",
+          "spray para tecidos"
+        ]
+      },
+      "cozinha_utilidades": {
+        "essencial": true,
+        "produtos": [
+          "escorredor de louca",
+          "porta detergente",
+          "porta esponja",
+          "lixeira",
+          "lixeira com pedal",
+          "lixeira para banheiro",
+          "organizador de pia",
+          "tapete de cozinha",
+          "luva termica",
+          "pegador de panela"
+        ]
+      },
+      "organizacao": {
+        "essencial": false,
+        "produtos": [
+          "caixa organizadora",
+          "cesto organizador",
+          "organizador de armario",
+          "organizador de geladeira",
+          "organizador de gaveta",
+          "cabide",
+          "prendedor de roupa",
+          "varal",
+          "varal de chao",
+          "varal de parede"
+        ]
+      },
+      "manutencao_basica": {
+        "essencial": false,
+        "produtos": [
+          "lampada led",
+          "lampada fluorescente",
+          "extensao eletrica",
+          "fita isolante",
+          "fita adesiva",
+          "super cola",
+          "cola branca",
+          "pregos",
+          "parafusos",
+          "buchas",
+          "martelo",
+          "chave de fenda",
+          "chave philips"
+        ]
+      },
+      "inseticidas": {
+        "essencial": false,
+        "produtos": [
+          "inseticida aerosol",
+          "repelente eletrico",
+          "refil repelente",
+          "veneno para formiga",
+          "veneno para rato",
+          "armadilha para insetos",
+          "repelente corporal"
+        ]
+      },
+      "automotivo_basico": {
+        "essencial": false,
+        "produtos": [
+          "shampoo automotivo",
+          "cera automotiva",
+          "limpa painel",
+          "limpa vidros automotivo",
+          "esponja automotiva",
+          "pano microfibra"
+        ]
+      }
+    }
+  },
+  "bebidas": {
+    "subcategorias": {
+      "hidratacao_basica": {
+        "essencial": true,
+        "produtos": [
+          "agua mineral sem gas",
+          "agua mineral com gas",
+          "agua mineral garrafao 20l",
+          "agua saborizada",
+          "agua alcalina",
+          "agua de coco"
+        ]
+      },
+      "bebidas_vegetais": {
+        "essencial": false,
+        "produtos": [
+          "leite de soja",
+          "leite de amendoa",
+          "leite de aveia",
+          "leite de coco",
+          "leite de castanha",
+          "bebida vegetal proteica"
+        ]
+      },
+      "sucos": {
+        "essencial": false,
+        "produtos": [
+          "suco natural",
+          "suco integral",
+          "suco concentrado",
+          "suco em po",
+          "suco de caixinha",
+          "polpa de fruta",
+          "nectar de fruta"
+        ]
+      },
+      "refrigerantes": {
+        "essencial": false,
+        "produtos": [
+          "refrigerante cola",
+          "refrigerante guarana",
+          "refrigerante laranja",
+          "refrigerante limao",
+          "refrigerante zero acucar",
+          "refrigerante diet",
+          "refrigerante 2 litros",
+          "refrigerante lata",
+          "refrigerante garrafa vidro"
+        ]
+      },
+      "bebidas_energeticas": {
+        "essencial": false,
+        "produtos": [
+          "energetico tradicional",
+          "energetico zero acucar",
+          "energetico lata",
+          "shot energetico",
+          "bebida energetica natural"
+        ]
+      },
+      "bebidas_isotonicas": {
+        "essencial": false,
+        "produtos": [
+          "isotonico tradicional",
+          "isotonico zero",
+          "isotonico em po",
+          "repositor eletrolitico"
+        ]
+      },
+      "bebidas_alcoolicas": {
+        "essencial": false,
+        "subcategorias": {
+          "cervejas": [
+            "cerveja pilsen",
+            "cerveja puro malte",
+            "cerveja lata",
+            "cerveja long neck",
+            "cerveja artesanal",
+            "cerveja sem alcool"
+          ],
+          "vinhos": [
+            "vinho tinto",
+            "vinho branco",
+            "vinho rose",
+            "vinho suave",
+            "vinho seco",
+            "espumante",
+            "champagne"
+          ],
+          "destilados": [
+            "vodka",
+            "whisky",
+            "rum",
+            "gin",
+            "tequila",
+            "cachaca",
+            "licor"
+          ],
+          "prontos_para_beber": [
+            "drink pronto lata",
+            "ice bebida alcoolica",
+            "coquetel pronto"
+          ]
+        }
+      },
+      "bebidas_funcionais": {
+        "essencial": false,
+        "produtos": [
+          "kombucha",
+          "bebida probiotica",
+          "bebida detox",
+          "suco verde",
+          "bebida proteica",
+          "shake nutricional",
+          "suplemento liquido"
+        ]
+      },
+      "outros": {
+        "essencial": false,
+        "produtos": [
+          "xarope para bebidas",
+          "mistura para drinks",
+          "agua tonica",
+          "agua sabor limao",
+          "bebida gaseificada artesanal"
+        ]
+      }
+    }
+  },
+  "carnes": {
+    "grupos": {
+      "bovinos": {
+        "essencial": true,
+        "produtos": [
+          "alcatra",
+          "contra file",
+          "patinho (moido ou bife)",
+          "coxao mole",
+          "coxao duro",
+          "acem (moido ou panela)",
+          "musculo",
+          "fraldinha",
+          "maminha",
+          "picanha",
+          "cupim",
+          "costela bovina",
+          "carne de sol / charque",
+          "figado bovino"
+        ]
+      },
+      "suinos": {
+        "essencial": true,
+        "produtos": [
+          "bisteca suina",
+          "lombo suino",
+          "pernil (cubos ou peca)",
+          "paleta suina",
+          "picanha suina",
+          "costelinha suina fresca",
+          "file suino/suan"
+        ]
+      },
+      "aves": {
+        "essencial": true,
+        "produtos": [
+          "filé de peito de frango",
+          "sobrecoxa (com ou sem osso)",
+          "frango inteiro",
+          "asa de frango (tulipa)",
+          "coxinha da asa",
+          "coracao de frango",
+          "sassami",
+          "frango a passarinho",
+          "file de peru"
+        ]
+      },
+      "processados_e_embutidos": {
+        "essencial": false,
+        "produtos": [
+          "linguica toscana (churrasco)",
+          "linguica calabresa",
+          "linguica de frango",
+          "linguica fina / mista",
+          "salsicha hot dog",
+          "bacon (cubos ou fatias)",
+          "paio",
+          "hamburguer (bovino/frango/vegetal)",
+          "nuggets / empanados",
+          "pao de alho"
+        ]
+      }
+    }
+  },
+  "comidas_prontas_e_congelados": {
+    "subcategorias": {
+      "pratos_prontos_individuais": {
+        "essencial": false,
+        "produtos": [
+          "lasanha congelada (carne/queijo/frango)",
+          "escondidinho (carne seca/frango)",
+          "parmegiana congelada",
+          "strogonoff congelado",
+          "marmita fit pronta",
+          "yakisoba congelado",
+          "macarrao instantaneo (cup noodles)"
+        ]
+      },
+      "lanches_e_petiscos": {
+        "essencial": false,
+        "produtos": [
+          "pizza congelada",
+          "pao de queijo (pacote)",
+          "nuggets / empanados de frango",
+          "steak de frango",
+          "hamburguer congelado",
+          "salgadinhos de festa (coxinha/kibe/bolinha de queijo)",
+          "folhado congelado",
+          "burrito / hot pocket"
+        ]
+      },
+      "acompanhamentos_congelados": {
+        "essencial": false,
+        "produtos": [
+          "batata frita palito",
+          "batata rustica / carinha",
+          "aneis de cebola",
+          "mandioca congelada",
+          "polenta palito",
+          "vegetais seletos (mix cenoura, ervilha, milho)",
+          "brocolis congelado",
+          "couve-flor congelada"
+        ]
+      },
+      "sobremesas_congeladas": {
+        "essencial": false,
+        "produtos": [
+          "sorvete de massa (pote)",
+          "picole",
+          "açai (pote)",
+          "torta holandesa congelada",
+          "petit gateau pronto",
+          "frutas congeladas (morango/frutas vermelhas)"
+        ]
+      },
+      "massas_frescas_refrigeradas": {
+        "essencial": true,
+        "produtos": [
+          "massa de lasanha fresca",
+          "massa de pastel",
+          "massa de pizza pronta",
+          "nhoque fresco",
+          "ravioli / capeletti fresco",
+          "massa de panqueca pronta"
+        ]
+      }
+    }
+  },
+  "frios_leites_e_derivados": {
+    "grupos": {
+      "leites_e_bebidas": {
+        "essencial": true,
+        "produtos": [
+          "leite integral",
+          "leite desnatado",
+          "leite semidesnatado",
+          "leite zero lactose",
+          "leite em po",
+          "achocolatado liquido",
+          "bebida lactea / vitamina",
+          "leite de coco (culinario)"
+        ]
+      },
+      "iogurtes_e_sobremesas_lacteas": {
+        "essencial": false,
+        "produtos": [
+          "iogurte natural",
+          "iogurte com frutas",
+          "iogurte grego",
+          "iogurte liquido (garrafao)",
+          "petit suisse (tipo danoninho)",
+          "chamyto / yakult",
+          "sobremesa de chocolate / flan",
+          "coalhada"
+        ]
+      },
+      "queijos": {
+        "essencial": true,
+        "produtos": [
+          "mussarela fatiada",
+          "queijo prato",
+          "queijo branco / minas frescal",
+          "queijo ricota",
+          "queijo coalho",
+          "queijo parmesao (peca ou ralado)",
+          "queijo provolone",
+          "queijo gorgonzola",
+          "queijo cheddar (fatiado ou bisnaga)",
+          "cream cheese",
+          "requeijao cremoso"
+        ]
+      },
+      "frios_e_embutidos_fatiados": {
+        "essencial": true,
+        "produtos": [
+          "presunto cozido",
+          "apresuntado",
+          "peito de peru",
+          "blanquet de peru",
+          "mortadela tradicional",
+          "mortadela defumada / italiana",
+          "salame / salaminho",
+          "lombo defumado",
+          "copa",
+          "pate pronto"
+        ]
+      },
+      "manteigas_e_gorduras_lacteas": {
+        "essencial": true,
+        "produtos": [
+          "manteiga com sal",
+          "manteiga sem sal",
+          "margarina",
+          "manteiga de garrafa",
+          "banha de porco"
+        ]
+      },
+      "itens_culinarios_lacteos": {
+        "essencial": true,
+        "produtos": [
+          "creme de leite",
+          "leite condensado",
+          "doce de leite",
+          "chantilly pronto"
+        ]
+      }
+    }
+  },
+  "higiene_pessoal": {
+    "subcategorias": {
+      "cuidados_com_o_corpo": {
+        "essencial": true,
+        "produtos": [
+          "sabonete em barra",
+          "sabonete liquido",
+          "sabonete esfoliante",
+          "oleo corporal",
+          "hidratante corporal",
+          "hidratante para as maos",
+          "hidratante para os pes",
+          "desodorante spray",
+          "desodorante roll-on",
+          "desodorante stick / barra",
+          "desodorante sem perfume",
+          "talco corporal",
+          "protetor solar corporal",
+          "pos-sol",
+          "esponja de banho",
+          "esponja de limpeza profunda"
+        ]
+      },
+      "cuidados_com_o_rosto": {
+        "essencial": false,
+        "produtos": [
+          "sabonete facial barra",
+          "sabonete facial liquido",
+          "gel de limpeza facial",
+          "tônico facial",
+          "agua micelar",
+          "hidratante facial dia (com fps)",
+          "hidratante facial noite",
+          "protetor solar facial",
+          "serum facial (vitamina c/ácido hialuronico)",
+          "mascara facial (argila/sheet mask)",
+          "esfoliante facial",
+          "creme para a area dos olhos",
+          "protetor labial / lip balm",
+          "demaquilante",
+          "lencos demaquilantes"
+        ]
+      },
+      "higiene_bucal": {
+        "essencial": true,
+        "produtos": [
+          "creme dental tradicional",
+          "creme dental branqueador",
+          "creme dental para sensibilidade",
+          "escova de dentes macia",
+          "escova de dentes media",
+          "escova de dentes eletrica",
+          "refil escova eletrica",
+          "fio dental",
+          "fita dental",
+          "enxaguante bucal (com ou sem alcool)",
+          "limpador de lingua",
+          "escova interdental",
+          "fixador de dentadura / protese"
+        ]
+      },
+      "cuidados_com_o_cabelo": {
+        "essencial": true,
+        "produtos": [
+          "shampoo tradicional",
+          "shampoo anti-caspa",
+          "shampoo matizador",
+          "condicionador",
+          "mascara de hidratacao / nutricao",
+          "creme para pentear / ativador de cachos",
+          "leave-in",
+          "oleo capilar / reparador de pontas",
+          "gel de cabelo",
+          "pomada modeladora",
+          "spray fixador (laque)",
+          "ampola de tratamento",
+          "shampoo a seco",
+          "tintura para cabelo / tonalizante",
+          "agua oxigenada",
+          "po descolorante"
+        ]
+      },
+      "feminino_e_cuidados_intimos": {
+        "essencial": true,
+        "produtos": [
+          "absorvente com abas",
+          "absorvente sem abas",
+          "absorvente noturno",
+          "absorvente interno",
+          "protetor diario (carefree)",
+          "sabonete intimo liquido",
+          "lenço umedecido intimo",
+          "coletor menstrual",
+          "disco menstrual"
+        ]
+      },
+      "barbear_e_depilacao": {
+        "essencial": true,
+        "produtos": [
+          "lamina de barbear descartavel",
+          "aparelho de barbear / depilar",
+          "carga para aparelho (par)",
+          "espuma de barbear",
+          "gel de barbear",
+          "pos-barba (locao ou gel)",
+          "creme depilatorio",
+          "folhas de cera fria",
+          "cera quente (microondas)",
+          "aparador de pelos eletrico"
+        ]
+      },
+      "cuidados_com_as_maos_e_unhas": {
+        "essencial": false,
+        "produtos": [
+          "algodao em bola",
+          "algodao em disco",
+          "hastes flexiveis (cotonetes)",
+          "acetona / removedor de esmalte",
+          "esmalte (cores variadas)",
+          "base de unha",
+          "extra brilho / top coat",
+          "lixa de unha",
+          "cortador de unha / alicate",
+          "oleo de cuticula"
+        ]
+      }
+    }
+  },
+  "hortifruti_e_ovos": {
+    "subcategorias": {
+      "frutas": {
+        "essencial": true,
+        "produtos": [
+          "abacate",
+          "abacaxi",
+          "abiu",
+          "acerola",
+          "ameixa nacional",
+          "ameixa importada",
+          "amora",
+          "atemoia",
+          "avocado",
+          "banana prata",
+          "banana nanica",
+          "banana da terra",
+          "banana maca",
+          "banana ouro",
+          "bacuri",
+          "biriba",
+          "caju",
+          "caqui chocolate",
+          "caqui fuyu",
+          "caqui rama forte",
+          "carambola",
+          "castanha",
+          "cereja",
+          "coco verde",
+          "coco seco",
+          "cupuaçu",
+          "damasco",
+          "figo",
+          "framboesa",
+          "fruta do conde",
+          "goiaba branca",
+          "goiaba vermelha",
+          "graviola",
+          "groselha",
+          "jabuticaba",
+          "jaca",
+          "jambo",
+          "janaguba",
+          "juran",
+          "kiwi nacional",
+          "kiwi gold",
+          "laranja pera",
+          "laranja lima",
+          "laranja bahia",
+          "laranja kinkan",
+          "laranja seleta",
+          "lichia",
+          "limao taiti",
+          "limao siciliano",
+          "limao galego",
+          "limao cravo",
+          "maca gala",
+          "maca fuji",
+          "maca verde",
+          "maca argentina",
+          "mamao papaia",
+          "mamao formosa",
+          "manga palmer",
+          "manga rosa",
+          "manga haden",
+          "manga espada",
+          "manga keitt",
+          "maracuja azedo",
+          "maracuja doce",
+          "marmelo",
+          "melancia",
+          "melancia baby",
+          "melao amarelo",
+          "melao cantaloupe",
+          "melao orange",
+          "melao pele de sapo",
+          "mirtilo",
+          "morango",
+          "nectarina",
+          "nespera",
+          "nêspera (ameixa amarela)",
+          "pequi",
+          "pessego",
+          "physalis",
+          "pinha",
+          "pitanga",
+          "pitaya rosa",
+          "pitaya branca",
+          "pitaya amarela",
+          "roma",
+          "seriguela",
+          "tâmara",
+          "tamarindo",
+          "tangerina murcote",
+          "tangerina ponkan",
+          "tangerina cravo",
+          "tangerina decopon",
+          "uva thompson",
+          "uva crimson",
+          "uva italia",
+          "uva vitoria",
+          "uva niagara",
+          "uva nubia"
+        ]
+      },
+      "verduras_e_folhas": {
+        "essencial": true,
+        "produtos": [
+          "acelga",
+          "agriao",
+          "alface americana",
+          "alface crespa",
+          "alface lisa",
+          "alface roxa",
+          "alface romana",
+          "alface mimosa",
+          "almeirao",
+          "alcaparra",
+          "aspargos",
+          "brocolis comum",
+          "brocolis ninja",
+          "brocolis ramoso",
+          "cebolinha",
+          "chicoria",
+          "coentro",
+          "couve manteiga",
+          "couve de bruxelas",
+          "couve-flor",
+          "endivia",
+          "escarola",
+          "espinafre",
+          "hortela",
+          "louro",
+          "manjericao",
+          "manjerona",
+          "mostarda",
+          "ora-pro-nobis",
+          "radicchio",
+          "repolho verde",
+          "repolho roxo",
+          "rucula",
+          "salsa",
+          "salvia",
+          "taioba",
+          "tomilho"
+        ]
+      },
+      "legumes_e_vegetais": {
+        "essencial": true,
+        "produtos": [
+          "abobora cabotiá",
+          "abobora moranga",
+          "abobora paulista",
+          "abobrinha italiana",
+          "abobrinha menina",
+          "aho poró",
+          "alcachofra",
+          "alho",
+          "batata inglesa",
+          "batata doce",
+          "batata baroa",
+          "batata asterix",
+          "batata yacon",
+          "berinjela",
+          "beterraba",
+          "cará",
+          "cenoura",
+          "cenoura baby",
+          "cogumelo paris",
+          "cogumelo shimeji",
+          "cogumelo shitake",
+          "cogumelo portobello",
+          "chuchu",
+          "ervilha fresca",
+          "ervilha torta",
+          "fava",
+          "gengibre",
+          "grao de bico fresco",
+          "inhame",
+          "jilo",
+          "mandioca",
+          "maxixe",
+          "milho verde (espiga)",
+          "palmito",
+          "pepino japones",
+          "pepino comum",
+          "pepino caipira",
+          "pimentao verde",
+          "pimentao amarelo",
+          "pimentao vermelho",
+          "pimenta dedo de moca",
+          "pimenta de cheiro",
+          "pimenta biquinho",
+          "pimenta malagueta",
+          "quiabo",
+          "rabanete",
+          "tomate italiano",
+          "tomate debora",
+          "tomate cereja",
+          "tomate grape",
+          "tomate caqui",
+          "vagem macarrao",
+          "vagem holandesa"
+        ]
+      },
+      "ovos": {
+        "essencial": true,
+        "produtos": [
+          "ovos brancos",
+          "ovos vermelhos",
+          "ovos caipira",
+          "ovos de codorna",
+          "ovos organico",
+          "ovos omega 3"
+        ]
+      }
+    }
+  },
+  "mercearia": {
+    "subcategorias": {
+      "graos_e_farinaceos": {
+        "essencial": true,
+        "produtos": [
+          "arroz branco",
+          "arroz integral",
+          "arroz parboilizado",
+          "arroz arbóreo (risoto)",
+          "arroz jasmim",
+          "feijao carioca",
+          "feijao preto",
+          "feijao branco",
+          "feijao corda",
+          "feijao fradinho",
+          "grao de bico",
+          "lentilha",
+          "ervilha seca",
+          "soja em grao",
+          "farinha de trigo",
+          "farinha de mandioca",
+          "farinha de milho (fuba)",
+          "farinha de rosca",
+          "farinha de aveia",
+          "farinha de arroz",
+          "polvilho doce",
+          "polvilho azedo",
+          "tapioca (goma pronta)",
+          "cuscuz (flocao de milho)",
+          "quinoa"
+        ]
+      },
+      "massas": {
+        "essencial": true,
+        "produtos": [
+          "macarrao espaguete",
+          "macarrao parafuso (fusilli)",
+          "macarrao pena (penne)",
+          "macarrao ninho",
+          "macarrao padre nosso",
+          "macarrao para lasanha",
+          "macarrao integral",
+          "macarrao instantaneo (miojo)",
+          "macarrao de arroz (bifum)",
+          "canelone",
+          "nhoque (massa seca)"
+        ]
+      },
+      "óleos_gorduras_e_molhos": {
+        "essencial": true,
+        "produtos": [
+          "oleo de soja",
+          "oleo de girassol",
+          "oleo de milho",
+          "oleo de coco",
+          "azeite de oliva extra virgem",
+          "azeite de oliva tipo unico",
+          "vinagre de alcool",
+          "vinagre de maca",
+          "vinagre vinagre balsamico",
+          "molho de tomate (sachê/lata)",
+          "extrato de tomate",
+          "passata de tomate",
+          "ketchup",
+          "maionese",
+          "mostarda",
+          "molho shoyu",
+          "molho inglês",
+          "molho de pimenta",
+          "molho barbecue",
+          "molho para salada",
+          "leite de coco"
+        ]
+      },
+      "temperos_e_condimentos": {
+        "essencial": true,
+        "produtos": [
+          "sal refinado",
+          "sal grosso",
+          "sal rosa do himalaia",
+          "acucar refinado",
+          "acucar cristal",
+          "acucar demerara",
+          "acucar mascavo",
+          "adocante liquido",
+          "adocante em po",
+          "caldo de galinha/carne (cubo)",
+          "tempero pronto (pote)",
+          "pimenta do reino",
+          "oregano",
+          "canela em po/pau",
+          "cravo da india",
+          "noz moscada",
+          "curry",
+          "paprica doce/defumada",
+          "cominho",
+          "ajinomoto",
+          "bicarbonato de sodio",
+          "fermento quimico em po",
+          "fermento biologico seco"
+        ]
+      },
+      "conservas_e_enlatados": {
+        "essencial": false,
+        "produtos": [
+          "milho verde",
+          "ervilha",
+          "dueto (milho e ervilha)",
+          "seleta de legumes",
+          "atum ralado/inteiro",
+          "sardinha em oleo/molho",
+          "palmito em conserva",
+          "azeitona verde com/sem caroco",
+          "azeitona preta",
+          "champignon / cogumelo em conserva",
+          "picles",
+          "grão de bico em conserva",
+          "feijão em lata",
+          "salsicha em lata"
+        ]
+      },
+      "biscoitos_e_snacks": {
+        "essencial": false,
+        "produtos": [
+          "biscoito agua e sal",
+          "biscoito maizena",
+          "biscoito recheado chocolate/morango",
+          "biscoito wafer",
+          "biscoito cream cracker",
+          "biscoito de polvilho",
+          "cookies",
+          "batata chips / palha",
+          "salgadinho de pacote",
+          "amendoim torrado",
+          "pipoca de microondas",
+          "milho para pipoca comum"
+        ]
+      },
+      "matinal_e_sobremesa": {
+        "essencial": true,
+        "produtos": [
+          "cafe moido",
+          "cafe soluvel",
+          "cha em sachê",
+          "achocolatado em po",
+          "chocolate em po / cacau",
+          "gelatina (diversos sabores)",
+          "mistura para bolo",
+          "aveia em flocos",
+          "cereal matinal / granola",
+          "mel",
+          "geleia de frutas",
+          "doce de leite (pote)",
+          "goiabada"
+        ]
+      }
+    }
+  },
+  "padaria_e_sobremesas": {
+    "subcategorias": {
+      "paes_frescos": {
+        "essencial": true,
+        "produtos": [
+          "pao frances",
+          "pao de sal integral",
+          "pao de queijo fresco",
+          "pao de batata",
+          "pao de leite / bisnaguinha fresca",
+          "pao de milho",
+          "pao australiano",
+          "pao de hambúrguer com gergelim",
+          "pao de cachorro-quente",
+          "pao sirio / pita",
+          "baguete italiana",
+          "ciabatta"
+        ]
+      },
+      "paes_industrializados": {
+        "essencial": true,
+        "produtos": [
+          "pao de forma branco",
+          "pao de forma integral / multigraos",
+          "pao de forma sem casca",
+          "pao de forma artesanal",
+          "pao sovado de pacote",
+          "pao de hot dog pacote",
+          "pao de hambúrguer pacote",
+          "bisnaguinha de pacote",
+          "massa de wrap / tortilla (rap10)"
+        ]
+      },
+      "confeitaria_e_bolos": {
+        "essencial": false,
+        "produtos": [
+          "bolo de cenoura com chocolate",
+          "bolo de laranja",
+          "bolo de milho / fuba",
+          "bolo de chocolate",
+          "bolo de pote",
+          "fatia de torta doce",
+          "torta holandesa",
+          "torta de limao",
+          "pudim de leite moça",
+          "mousse de chocolate/maracuja",
+          "quindim",
+          "sonho de creme/doce de leite",
+          "carolina recheada",
+          "donuts / rosquinha doce",
+          "brownie",
+          "cookie artesanal"
+        ]
+      },
+      "salgados_de_balcao": {
+        "essencial": false,
+        "produtos": [
+          "coxinha de frango",
+          "kibe frito / assado",
+          "empada de frango/palmito",
+          "enroladinho de presunto e queijo",
+          "esfiha de carne/frango",
+          "pao italiano recheado",
+          "folhado de frango/queijo",
+          "pastel de feira / lanchonete"
+        ]
+      },
+      "chocolates_e_bomboniere": {
+        "essencial": false,
+        "produtos": [
+          "barra de chocolate ao leite",
+          "barra de chocolate amargo",
+          "barra de chocolate branco",
+          "caixa de bombom",
+          "bombom individual (sonho de valsa/ouro branco)",
+          "bis / wafer chocolate",
+          "trufa recheada",
+          "achocolatado em barra",
+          "pacoquinha",
+          "pe de moleque",
+          "chicletes",
+          "balas de goma / frutas",
+          "pirulitos",
+          "marshmallow",
+          "pastilha de menta"
+        ]
+      },
+      "sobremesas_geladas_e_diversos": {
+        "essencial": false,
+        "produtos": [
+          "sorvete de massa (pote 2l)",
+          "sorvete premium / artesanal",
+          "picole de frutas / leite",
+          "conezinho de sorvete",
+          "açai (pote ou balde)",
+          "frutas em calda (pessego/figo)",
+          "doce de corte (goiabada/marmelada)",
+          "chantilly em spray / caixinha"
+        ]
+      }
+    }
+  },
+  "pet_shop": {
+    "subcategorias": {
+      "alimentacao_gatos": {
+        "essencial": true,
+        "produtos": [
+          "racao seca para gatos adultos",
+          "racao seca para gatos castrados",
+          "racao seca para gatos filhotes",
+          "racao seca para gatos idosos (senior)",
+          "racao umida (sachê) - diversos sabores",
+          "racao umida (lata / patê)",
+          "leite substituto para filhotes",
+          "graminha para gatos (cat grass)"
+        ]
+      },
+      "higiene_e_limpeza_gatos": {
+        "essencial": true,
+        "produtos": [
+          "areia sanitaria (bentonita)",
+          "areia sanitaria de silica",
+          "areia sanitaria biodegradável (madeira/milho)",
+          "tapete coletor de areia",
+          "pa de limpeza para caixa de areia",
+          "eliminador de odores enzimatico",
+          "pipicat / aditivo perfumado para areia",
+          "tapete higienico",
+          "shampoo para gatos",
+          "condicionador para gatos",
+          "banho a seco (spray ou espuma)",
+          "lenco umedecido pet"
+        ]
+      },
+      "saude_e_bem_estar": {
+        "essencial": true,
+        "produtos": [
+          "antipulgas e carrapatos (pipeta/comprimido)",
+          "vermicida pet",
+          "coleira antipulgas",
+          "suplemento vitaminico pet",
+          "pasta para bolas de pelo (malt paste)",
+          "limpa orelhas pet",
+          "limpa lagrimas / colirio pet",
+          "pasta de dente pet",
+          "escova de dentes pet"
+        ]
+      },
+      "mimos_e_acessorios": {
+        "essencial": false,
+        "produtos": [
+          "petisco para gatos (dreamies/snacks)",
+          "catnip (erva de gato) - spray ou seca",
+          "brinquedo de varinha",
+          "bolinha de feltro / plastico",
+          "arranhador de carpete / sisal",
+          "caixa de transporte",
+          "comedouro / bebedouro",
+          "fonte de agua eletrica",
+          "coleira e guia",
+          "caminha ou toca",
+          "escova / pente para pelos"
+        ]
+      },
+      "alimentacao_caes (geral)": {
+        "essencial": false,
+        "produtos": [
+          "racao seca para caes adultos",
+          "racao seca para caes filhotes",
+          "racao seca racas pequenas",
+          "racao seca racas grandes",
+          "sachê para caes",
+          "patê em lata para caes",
+          "biscoito canino / petiscos",
+          "osso de couro / nylon"
+        ]
+      }
+    }
+  },
+  "saude_e_beleza": {
+    "subcategorias": {
+      "primeiros_socorros": {
+        "essencial": true,
+        "produtos": [
+          "curativo autoadesivo (band-aid)",
+          "algodao",
+          "gaze esterilizada",
+          "esparadrapo / fita micropore",
+          "antisseptico spray / liquido",
+          "soro fisiologico",
+          "alcool 70%",
+          "alcool em gel",
+          "termometro digital",
+          "pomada para assadura / irritacao",
+          "pomada para queimadura",
+          "gel de arnica / massagem muscular",
+          "bolsa termica (gel ou borracha)"
+        ]
+      },
+      "vitaminas_e_suplementos": {
+        "essencial": false,
+        "produtos": [
+          "multivitaminico",
+          "vitamina c efervescente",
+          "vitamina d",
+          "omega 3",
+          "colageno em po / capsula",
+          "whey protein / proteina em po",
+          "creatina",
+          "barra de proteina",
+          "probiotico",
+          "melatonina"
+        ]
+      },
+      "cuidados_esteticos_e_maquiagem": {
+        "essencial": false,
+        "produtos": [
+          "base facial",
+          "corretivo",
+          "po compacto / translucido",
+          "blush / iluminador",
+          "rimel / mascara de cilios",
+          "lapis de olho / delineador",
+          "sombra para olhos",
+          "batom / gloss labial",
+          "fixador de maquiagem",
+          "cilios posticos",
+          "cola para cilios"
+        ]
+      },
+      "acessorios_de_beleza": {
+        "essencial": false,
+        "produtos": [
+          "pincel de maquiagem",
+          "esponja de maquiagem (beauty blender)",
+          "pinça de sobrancelha",
+          "curvex",
+          "escova de cabelo",
+          "pente",
+          "elastico de cabelo (rabicó/xuxinha)",
+          "presilha / grampo de cabelo",
+          "touca de banho",
+          "touca de cetim",
+          "espelho de bolsa"
+        ]
+      },
+      "bem_estar_e_relaxamento": {
+        "essencial": false,
+        "produtos": [
+          "oleo essencial",
+          "sais de banho",
+          "bomba de banho (bath bomb)",
+          "mascara termica para olhos",
+          "tapa olhos para dormir",
+          "protetor auricular (tampao)",
+          "massageador manual",
+          "incenso / difusor de varetas"
+        ]
+      },
+      "saude_sexual": {
+        "essencial": true,
+        "produtos": [
+          "preservativo masculino",
+          "preservativo feminino",
+          "lubrificante intimo",
+          "teste de gravidez de farmacia",
+          "gel estimulante"
+        ]
+      }
+    }
+  }
+}
