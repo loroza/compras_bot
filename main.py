@@ -24,6 +24,13 @@ class MainState(StatesGroup):
     escolhendo_departamento = State()
     menu_principal = State()
     finalizando_mercado = State()
+    confirmando_finalizar = State()
+    # Carrinho
+    carrinho_menu = State()
+    removendo_item = State()
+    # Histórico
+    historico_menu = State()
+    historico_detalhe = State()
 
 
 class ShopState(StatesGroup):
@@ -44,7 +51,7 @@ def kb_menu_principal():
     return ReplyKeyboardMarkup(
         keyboard=[
             [KeyboardButton(text="🛒 Compras"), KeyboardButton(text="📲 Cadastros")],
-            [KeyboardButton(text="🏁 Finalizar")],
+            [KeyboardButton(text="📜 Histórico"), KeyboardButton(text="🔄 Trocar Departamento")],
         ],
         resize_keyboard=True,
     )
@@ -72,6 +79,26 @@ def kb_menu_cadastros():
     )
 
 
+def kb_carrinho_menu():
+    return ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="🗑️ Remover Item"), KeyboardButton(text="🧹 Limpar Carrinho")],
+            [KeyboardButton(text="🏁 Finalizar Compra")],
+            [KeyboardButton(text="⬅️ Voltar Compras")],
+        ],
+        resize_keyboard=True,
+    )
+
+
+def kb_confirmar():
+    return ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="✅ Confirmar"), KeyboardButton(text="❌ Cancelar")],
+        ],
+        resize_keyboard=True,
+    )
+
+
 def kb_opcoes(lista, voltar=True):
     btns = [[KeyboardButton(text=catalogo.formatar(opt))] for opt in lista]
     if voltar:
@@ -83,7 +110,7 @@ def kb_opcoes(lista, voltar=True):
 async def extrato_carrinho(message: types.Message, dep_id: int):
     itens = await database.pegar_carrinho(message.from_user.id, dep_id)
     if not itens:
-        return
+        return False
 
     texto = "🛒 *Carrinho atual:*\n\n"
     total = 0
@@ -97,6 +124,7 @@ async def extrato_carrinho(message: types.Message, dep_id: int):
 
     texto += f"\n💰 *Total: R${total:.2f}*"
     await message.answer(texto, parse_mode="Markdown")
+    return True
 
 
 async def get_dep_data(state: FSMContext):
@@ -126,6 +154,8 @@ async def limpar_estado_preservando_departamento(state: FSMContext):
             }
         )
 
+
+# ─── /start ────
 
 @dp.message(CommandStart())
 async def start(message: types.Message, state: FSMContext):
@@ -176,6 +206,8 @@ async def escolher_departamento(message: types.Message, state: FSMContext):
     )
 
 
+# ─── MENUS ────
+
 @dp.message(F.text == "🛒 Compras")
 async def abrir_compras(message: types.Message, state: FSMContext):
     dep_id, _, _, _ = await get_dep_data(state)
@@ -207,6 +239,35 @@ async def voltar_menu_principal(message: types.Message, state: FSMContext):
     await message.answer("Menu principal:", reply_markup=kb_menu_principal())
 
 
+@dp.message(F.text == "⬅️ Voltar Compras")
+async def voltar_compras(message: types.Message, state: FSMContext):
+    dep_id, _, _, _ = await get_dep_data(state)
+    if not dep_id:
+        return await message.answer("Envie /start e escolha um departamento primeiro.")
+
+    await limpar_estado_preservando_departamento(state)
+    await state.set_state(MainState.menu_principal)
+    await message.answer("🛒 Menu de Compras:", reply_markup=kb_menu_compras())
+
+
+# ─── TROCAR DEPARTAMENTO ────
+
+@dp.message(F.text == "🔄 Trocar Departamento")
+async def trocar_departamento(message: types.Message, state: FSMContext):
+    deps = await database.listar_departamentos()
+    if not deps:
+        return await message.answer("Nenhum departamento encontrado.")
+
+    await state.clear()
+    await state.set_state(MainState.escolhendo_departamento)
+    await message.answer(
+        "🏬 Escolha o departamento:",
+        reply_markup=kb_departamentos(deps),
+    )
+
+
+# ─── COMPRA AVULSA ────
+
 @dp.message(F.text == "🛒 Compra Avulsa")
 async def start_buy(message: types.Message, state: FSMContext):
     dep_id, dep_nome, _, _ = await get_dep_data(state)
@@ -216,8 +277,6 @@ async def start_buy(message: types.Message, state: FSMContext):
     await limpar_estado_preservando_departamento(state)
     await state.set_state(ShopState.navegando)
     await state.update_data(caminho=[])
-
-    await database.limpar_carrinho(message.from_user.id, dep_id)
 
     if not catalogo.CATALOGO:
         return await message.answer("Esse departamento ainda não possui catálogo configurado.")
@@ -254,7 +313,7 @@ async def navegar(message: types.Message, state: FSMContext):
     if message.text == "❌ Cancelar":
         await limpar_estado_preservando_departamento(state)
         await state.set_state(MainState.menu_principal)
-        return await message.answer("Operação cancelada.", reply_markup=kb_menu_principal())
+        return await message.answer("Operação cancelada.", reply_markup=kb_menu_compras())
 
     tipo, chave = catalogo.identificar_escolha(caminho, message.text)
 
@@ -327,6 +386,8 @@ async def set_valor(message: types.Message, state: FSMContext):
     )
 
 
+# ─── VER CARRINHO ────
+
 @dp.message(F.text == "📦 Ver Carrinho")
 async def ver_carrinho(message: types.Message, state: FSMContext):
     dep_id, _, _, _ = await get_dep_data(state)
@@ -335,11 +396,10 @@ async def ver_carrinho(message: types.Message, state: FSMContext):
 
     itens = await database.pegar_carrinho(message.from_user.id, dep_id)
     if not itens:
-        return await message.answer("Carrinho vazio!")
+        return await message.answer("🛒 Carrinho vazio!", reply_markup=kb_menu_compras())
 
     texto = "🛒 *Carrinho Atual:*\n\n"
     total = 0
-
     for item in itens:
         sub = item["quantidade"] * item["valor_unitario"]
         total += sub
@@ -347,24 +407,138 @@ async def ver_carrinho(message: types.Message, state: FSMContext):
             f"• {item['item_nome']}: "
             f"{item['quantidade']}x R${item['valor_unitario']:.2f} = R${sub:.2f}\n"
         )
-
     texto += f"\n💰 *TOTAL: R${total:.2f}*"
-    await message.answer(texto, parse_mode="Markdown")
+
+    await state.set_state(MainState.carrinho_menu)
+    await message.answer(texto, parse_mode="Markdown", reply_markup=kb_carrinho_menu())
 
 
-@dp.message(F.text == "🏁 Finalizar")
-async def finalizar(message: types.Message, state: FSMContext):
+# ─── REMOVER ITEM DO CARRINHO ────
+
+@dp.message(MainState.carrinho_menu, F.text == "🗑️ Remover Item")
+async def remover_item_inicio(message: types.Message, state: FSMContext):
     dep_id, _, _, _ = await get_dep_data(state)
-    if not dep_id:
-        return await message.answer("Envie /start e escolha um departamento primeiro.")
+    itens = await database.pegar_carrinho(message.from_user.id, dep_id)
+
+    if not itens:
+        return await message.answer("Carrinho já está vazio.")
+
+    btns = [[KeyboardButton(text=item["item_nome"])] for item in itens]
+    btns.append([KeyboardButton(text="⬅️ Voltar Carrinho")])
+    kb = ReplyKeyboardMarkup(keyboard=btns, resize_keyboard=True)
+
+    await state.set_state(MainState.removendo_item)
+    await message.answer("Qual item deseja remover?", reply_markup=kb)
+
+
+@dp.message(MainState.removendo_item)
+async def remover_item_confirmar(message: types.Message, state: FSMContext):
+    dep_id, _, _, _ = await get_dep_data(state)
+
+    if message.text == "⬅️ Voltar Carrinho":
+        await state.set_state(MainState.carrinho_menu)
+        itens = await database.pegar_carrinho(message.from_user.id, dep_id)
+        texto = "🛒 *Carrinho Atual:*\n\n"
+        total = 0
+        for item in itens:
+            sub = item["quantidade"] * item["valor_unitario"]
+            total += sub
+            texto += f"• {item['item_nome']}: {item['quantidade']}x R${item['valor_unitario']:.2f} = R${sub:.2f}\n"
+        texto += f"\n💰 *TOTAL: R${total:.2f}*"
+        return await message.answer(texto, parse_mode="Markdown", reply_markup=kb_carrinho_menu())
+
+    nome_item = message.text.strip()
+    await database.remover_item_carrinho(message.from_user.id, dep_id, nome_item)
 
     itens = await database.pegar_carrinho(message.from_user.id, dep_id)
+    await state.set_state(MainState.carrinho_menu)
+
     if not itens:
-        await state.clear()
-        return await message.answer(
-            "👋 Até logo!\nSe quiser começar de novo, envie /start.",
-            reply_markup=ReplyKeyboardRemove(),
+        await message.answer(
+            f"✅ *{nome_item}* removido. Carrinho vazio.",
+            parse_mode="Markdown",
+            reply_markup=kb_menu_compras(),
         )
+        await limpar_estado_preservando_departamento(state)
+        await state.set_state(MainState.menu_principal)
+        return
+
+    texto = f"✅ *{nome_item}* removido.\n\n🛒 *Carrinho Atual:*\n\n"
+    total = 0
+    for item in itens:
+        sub = item["quantidade"] * item["valor_unitario"]
+        total += sub
+        texto += f"• {item['item_nome']}: {item['quantidade']}x R${item['valor_unitario']:.2f} = R${sub:.2f}\n"
+    texto += f"\n💰 *TOTAL: R${total:.2f}*"
+    await message.answer(texto, parse_mode="Markdown", reply_markup=kb_carrinho_menu())
+
+
+# ─── LIMPAR CARRINHO ────
+
+@dp.message(MainState.carrinho_menu, F.text == "🧹 Limpar Carrinho")
+async def limpar_carrinho_menu(message: types.Message, state: FSMContext):
+    await state.update_data(acao_pendente="limpar")
+    await message.answer(
+        "⚠️ Tem certeza que deseja limpar todo o carrinho?",
+        reply_markup=kb_confirmar(),
+    )
+
+
+@dp.message(MainState.carrinho_menu, F.text == "✅ Confirmar")
+async def confirmar_acao_carrinho(message: types.Message, state: FSMContext):
+    dep_id, _, _, _ = await get_dep_data(state)
+    data = await state.get_data()
+    acao = data.get("acao_pendente")
+
+    if acao == "limpar":
+        await database.limpar_carrinho(message.from_user.id, dep_id)
+        await limpar_estado_preservando_departamento(state)
+        await state.set_state(MainState.menu_principal)
+        await message.answer("🧹 Carrinho limpo!", reply_markup=kb_menu_compras())
+
+    elif acao == "finalizar":
+        mercado = data.get("mercado_pendente", "Não informado")
+        itens_detalhe = data.get("itens_detalhe", [])
+        total = data.get("total", 0)
+
+        await database.salvar_historico(dep_id, "Compra Avulsa", mercado, itens_detalhe, total)
+        await database.limpar_carrinho(message.from_user.id, dep_id)
+        await limpar_estado_preservando_departamento(state)
+        await state.set_state(MainState.menu_principal)
+
+        await message.answer(
+            f"✅ Compra no *{mercado}* finalizada!\n"
+            f"💰 Total: R${total:.2f}\n"
+            f"📦 {len(itens_detalhe)} itens registrados no histórico.",
+            parse_mode="Markdown",
+        )
+        await message.answer("O que deseja fazer agora?", reply_markup=kb_menu_principal())
+
+
+@dp.message(MainState.carrinho_menu, F.text == "❌ Cancelar")
+async def cancelar_acao_carrinho(message: types.Message, state: FSMContext):
+    dep_id, _, _, _ = await get_dep_data(state)
+    itens = await database.pegar_carrinho(message.from_user.id, dep_id)
+
+    texto = "🛒 *Carrinho Atual:*\n\n"
+    total = 0
+    for item in itens:
+        sub = item["quantidade"] * item["valor_unitario"]
+        total += sub
+        texto += f"• {item['item_nome']}: {item['quantidade']}x R${item['valor_unitario']:.2f} = R${sub:.2f}\n"
+    texto += f"\n💰 *TOTAL: R${total:.2f}*"
+    await message.answer(texto, parse_mode="Markdown", reply_markup=kb_carrinho_menu())
+
+
+# ─── FINALIZAR COMPRA (via carrinho) ────
+
+@dp.message(MainState.carrinho_menu, F.text == "🏁 Finalizar Compra")
+async def finalizar_do_carrinho(message: types.Message, state: FSMContext):
+    dep_id, _, _, _ = await get_dep_data(state)
+    itens = await database.pegar_carrinho(message.from_user.id, dep_id)
+
+    if not itens:
+        return await message.answer("Carrinho vazio!", reply_markup=kb_menu_compras())
 
     texto = "🛒 *Resumo do carrinho:*\n\n"
     total = 0
@@ -389,11 +563,7 @@ async def finalizar(message: types.Message, state: FSMContext):
 
     await state.set_state(MainState.finalizando_mercado)
     await state.update_data(itens_detalhe=itens_detalhe, total=total)
-    await message.answer(
-        texto,
-        parse_mode="Markdown",
-        reply_markup=ReplyKeyboardRemove(),
-    )
+    await message.answer(texto, parse_mode="Markdown", reply_markup=ReplyKeyboardRemove())
 
 
 @dp.message(MainState.finalizando_mercado)
@@ -408,19 +578,120 @@ async def finalizar_mercado(message: types.Message, state: FSMContext):
     itens_detalhe = data.get("itens_detalhe", [])
     total = data.get("total", 0)
 
-    await database.salvar_historico(dep_id, "Compra Avulsa", mercado, itens_detalhe, total)
-    await database.limpar_carrinho(message.from_user.id, dep_id)
+    # Guarda mercado e pede confirmação
+    await state.update_data(mercado_pendente=mercado)
+    await state.set_state(MainState.carrinho_menu)
+    await state.update_data(acao_pendente="finalizar")
 
-    await limpar_estado_preservando_departamento(state)
-    await state.set_state(MainState.menu_principal)
-
-    await message.answer(
-        f"✅ Compra no *{mercado}* finalizada!\n"
-        f"💰 Total: R${total:.2f}\n"
-        f"📦 {len(itens_detalhe)} itens registrados no histórico.",
-        parse_mode="Markdown",
+    texto = (
+        f"🏪 Mercado: *{mercado}*\n"
+        f"💰 Total: *R${total:.2f}*\n"
+        f"📦 {len(itens_detalhe)} itens\n\n"
+        f"Confirmar finalização?"
     )
-    await message.answer("O que deseja fazer agora?", reply_markup=kb_menu_principal())
+    await message.answer(texto, parse_mode="Markdown", reply_markup=kb_confirmar())
+
+
+# ─── HISTÓRICO ────
+
+@dp.message(F.text == "📜 Histórico")
+async def abrir_historico(message: types.Message, state: FSMContext):
+    dep_id, dep_nome, _, _ = await get_dep_data(state)
+    if not dep_id:
+        return await message.answer("Envie /start e escolha um departamento primeiro.")
+
+    compras = await database.listar_historico(dep_id)
+
+    if not compras:
+        return await message.answer(
+            "📜 Nenhuma compra registrada ainda.",
+            reply_markup=kb_menu_principal(),
+        )
+
+    btns = []
+    for c in compras:
+        data_fmt = c["data"].strftime("%d/%m/%Y %H:%M") if c["data"] else "?"
+        label = f"🏪 {c['mercado']} — R${c['total']:.2f} ({data_fmt})"
+        btns.append([KeyboardButton(text=label)])
+    btns.append([KeyboardButton(text="⬅️ Menu Principal")])
+
+    kb = ReplyKeyboardMarkup(keyboard=btns, resize_keyboard=True)
+    await state.set_state(MainState.historico_menu)
+    await state.update_data(historico_compras=[dict(c) for c in compras])
+    await message.answer(
+        f"📜 *Histórico de compras — {dep_nome}*\nSelecione uma compra para ver os detalhes:",
+        parse_mode="Markdown",
+        reply_markup=kb,
+    )
+
+
+@dp.message(MainState.historico_menu)
+async def selecionar_historico(message: types.Message, state: FSMContext):
+    if message.text == "⬅️ Menu Principal":
+        await limpar_estado_preservando_departamento(state)
+        await state.set_state(MainState.menu_principal)
+        return await message.answer("Menu principal:", reply_markup=kb_menu_principal())
+
+    data = await state.get_data()
+    compras = data.get("historico_compras", [])
+
+    compra_selecionada = None
+    for c in compras:
+        from datetime import datetime
+        if isinstance(c["data"], str):
+            dt = datetime.fromisoformat(c["data"])
+        else:
+            dt = c["data"]
+        data_fmt = dt.strftime("%d/%m/%Y %H:%M")
+        label = f"🏪 {c['mercado']} — R${c['total']:.2f} ({data_fmt})"
+        if message.text == label:
+            compra_selecionada = c
+            break
+
+    if not compra_selecionada:
+        return await message.answer("Selecione uma compra válida.")
+
+    itens = await database.listar_itens_historico(compra_selecionada["id"])
+
+    texto = (
+        f"🏪 *Mercado:* {compra_selecionada['mercado']}\n"
+        f"💰 *Total:* R${compra_selecionada['total']:.2f}\n"
+        f"📅 *Data:* {data_fmt}\n\n"
+        f"📦 *Itens:*\n"
+    )
+    for item in itens:
+        sub = item["quantidade"] * item["valor_unitario"]
+        texto += f"• {item['item_nome']}: {item['quantidade']}x R${item['valor_unitario']:.2f} = R${sub:.2f}\n"
+
+    kb_voltar = ReplyKeyboardMarkup(
+        keyboard=[[KeyboardButton(text="⬅️ Voltar Histórico")], [KeyboardButton(text="⬅️ Menu Principal")]],
+        resize_keyboard=True,
+    )
+    await state.set_state(MainState.historico_detalhe)
+    await message.answer(texto, parse_mode="Markdown", reply_markup=kb_voltar)
+
+
+@dp.message(MainState.historico_detalhe)
+async def historico_detalhe_nav(message: types.Message, state: FSMContext):
+    dep_id, dep_nome, _, _ = await get_dep_data(state)
+
+    if message.text == "⬅️ Voltar Histórico":
+        compras = await database.listar_historico(dep_id)
+        btns = []
+        for c in compras:
+            data_fmt = c["data"].strftime("%d/%m/%Y %H:%M") if c["data"] else "?"
+            label = f"🏪 {c['mercado']} — R${c['total']:.2f} ({data_fmt})"
+            btns.append([KeyboardButton(text=label)])
+        btns.append([KeyboardButton(text="⬅️ Menu Principal")])
+        kb = ReplyKeyboardMarkup(keyboard=btns, resize_keyboard=True)
+        await state.set_state(MainState.historico_menu)
+        await state.update_data(historico_compras=[dict(c) for c in compras])
+        return await message.answer("📜 Selecione uma compra:", reply_markup=kb)
+
+    if message.text == "⬅️ Menu Principal":
+        await limpar_estado_preservando_departamento(state)
+        await state.set_state(MainState.menu_principal)
+        return await message.answer("Menu principal:", reply_markup=kb_menu_principal())
 
 
 async def main():

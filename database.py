@@ -81,7 +81,6 @@ async def init_db():
             );
         """)
 
-        # Se o departamento padrão ainda não existir, cria.
         await conn.execute("""
             INSERT INTO departamentos (nome, emoji, catalogo_json)
             VALUES ('Supermercado', '🛒', 'supermercado.json')
@@ -333,6 +332,24 @@ async def pegar_carrinho(user_id=None, dep_id=None):
         await conn.close()
 
 
+async def remover_item_carrinho(user_id, dep_id, item_nome):
+    """Remove a primeira ocorrência do item no carrinho do usuário."""
+    conn = await get_conn()
+    try:
+        row = await conn.fetchrow(
+            """
+            SELECT id FROM carrinho
+            WHERE adicionado_por = $1 AND departamento_id = $2 AND item_nome = $3
+            LIMIT 1
+            """,
+            user_id, dep_id, item_nome
+        )
+        if row:
+            await conn.execute("DELETE FROM carrinho WHERE id = $1", row["id"])
+    finally:
+        await conn.close()
+
+
 async def limpar_carrinho(user_id=None, dep_id=None):
     conn = await get_conn()
     try:
@@ -465,5 +482,42 @@ async def salvar_historico(dep_id, lista_nome, mercado, itens_comprados_dict, to
                 compra_id, item["nome"], item["quantidade"], item["valor_unitario"]
             )
         return compra_id
+    finally:
+        await conn.close()
+
+
+async def listar_historico(dep_id, limite=20):
+    """Retorna as últimas compras do departamento, mais recentes primeiro."""
+    conn = await get_conn()
+    try:
+        rows = await conn.fetch(
+            """
+            SELECT id, mercado, total, data, lista_nome
+            FROM historico_compras
+            WHERE departamento_id = $1
+            ORDER BY data DESC
+            LIMIT $2
+            """,
+            dep_id, limite
+        )
+        return rows
+    finally:
+        await conn.close()
+
+
+async def listar_itens_historico(compra_id):
+    """Retorna os itens de uma compra específica do histórico."""
+    conn = await get_conn()
+    try:
+        rows = await conn.fetch(
+            """
+            SELECT item_nome, quantidade, valor_unitario
+            FROM historico_itens
+            WHERE compra_id = $1
+            ORDER BY id
+            """,
+            compra_id
+        )
+        return rows
     finally:
         await conn.close()
