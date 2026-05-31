@@ -30,8 +30,15 @@ def kb_produtos_menu():
     )
 
 
+def _texto_categoria(c):
+    """Monta o texto do botão de categoria com ou sem emoji."""
+    emoji = c["emoji"] or ""
+    nome = c["nome"]
+    return f"{emoji} {nome}".strip() if emoji else nome
+
+
 def kb_categoria_escolha(categorias):
-    btns = [[KeyboardButton(text=f"{c['emoji']} {c['nome']}")] for c in categorias]
+    btns = [[KeyboardButton(text=_texto_categoria(c))] for c in categorias]
     btns.append([KeyboardButton(text="🚫 Sem Categoria")])
     btns.append([KeyboardButton(text="❌ Cancelar")])
     return ReplyKeyboardMarkup(keyboard=btns, resize_keyboard=True)
@@ -69,16 +76,13 @@ async def get_dep_id(state: FSMContext):
 async def limpar_estado_preservando_departamento(state: FSMContext):
     dep_id, dep_nome, dep_emoji, catalogo_json = await get_dep_context(state)
     await state.clear()
-
     if dep_id:
-        await state.set_data(
-            {
-                "departamento_id": dep_id,
-                "departamento_nome": dep_nome,
-                "departamento_emoji": dep_emoji,
-                "catalogo_json": catalogo_json,
-            }
-        )
+        await state.set_data({
+            "departamento_id": dep_id,
+            "departamento_nome": dep_nome,
+            "departamento_emoji": dep_emoji,
+            "catalogo_json": catalogo_json,
+        })
 
 
 # ─── MENU PRODUTOS ────────────────────────────────────────────────────────────
@@ -88,7 +92,6 @@ async def menu_produtos(message: types.Message, state: FSMContext):
     dep_id = await get_dep_id(state)
     if not dep_id:
         return await message.answer("Envie /start e escolha um departamento primeiro.")
-
     await message.answer("📦 Menu de Produtos:", reply_markup=kb_produtos_menu())
 
 
@@ -108,14 +111,15 @@ async def novo_produto(message: types.Message, state: FSMContext):
 @router.message(ProdutoState.criando_nome)
 async def produto_nome(message: types.Message, state: FSMContext):
     nome = message.text.strip()
-    await state.update_data(produto_nome=nome)
-
     dep_id = await get_dep_id(state)
     if not dep_id:
         await state.clear()
         return await message.answer("Sessão expirada. Envie /start.")
 
+    await state.update_data(produto_nome=nome)
+
     categorias = await database.listar_categorias(dep_id)
+
     await state.set_state(ProdutoState.escolhendo_categoria)
 
     if not categorias:
@@ -151,7 +155,10 @@ async def produto_categoria(message: types.Message, state: FSMContext):
 
     if message.text != "🚫 Sem Categoria":
         categorias = await database.listar_categorias(dep_id)
-        mapa = {f"{c['emoji']} {c['nome']}": c["id"] for c in categorias}
+
+        # Monta mapa usando a mesma função _texto_categoria para garantir consistência
+        mapa = {_texto_categoria(c): c["id"] for c in categorias}
+        # Fallback: só o nome sem emoji
         mapa_simples = {c["nome"]: c["id"] for c in categorias}
 
         if message.text in mapa:
@@ -196,7 +203,7 @@ async def editar_produto(message: types.Message, state: FSMContext):
         return await message.answer("Nenhum produto cadastrado.", reply_markup=kb_produtos_menu())
 
     await state.set_state(ProdutoState.escolhendo_produto)
-    await message.answer("Escolha o produto:", reply_markup=kb_produto_escolha(produtos))
+    await message.answer("Escolha o produto para editar:", reply_markup=kb_produto_escolha(produtos))
 
 
 @router.message(ProdutoState.escolhendo_produto)
@@ -273,8 +280,7 @@ async def menu_edicao_produto(message: types.Message, state: FSMContext):
 
         if not categorias:
             return await message.answer(
-                "Nenhuma categoria cadastrada. Deseja deixar sem categoria?\n\n"
-                "Clique em '🚫 Sem Categoria' ou '❌ Cancelar'.",
+                "Nenhuma categoria cadastrada. Deseja deixar sem categoria?",
                 reply_markup=kb_categoria_escolha([]),
             )
 
@@ -328,7 +334,7 @@ async def produto_nova_categoria(message: types.Message, state: FSMContext):
 
     if message.text != "🚫 Sem Categoria":
         categorias = await database.listar_categorias(dep_id)
-        mapa = {f"{c['emoji']} {c['nome']}": c["id"] for c in categorias}
+        mapa = {_texto_categoria(c): c["id"] for c in categorias}
         mapa_simples = {c["nome"]: c["id"] for c in categorias}
 
         if message.text in mapa:
@@ -365,7 +371,6 @@ async def excluir_produto_menu(message: types.Message, state: FSMContext):
         return await message.answer("Nenhum produto cadastrado.", reply_markup=kb_produtos_menu())
 
     await state.set_state(ProdutoState.escolhendo_produto)
-    await state.update_data(modo="excluir")
     await message.answer(
         "Qual produto deseja excluir?",
         reply_markup=kb_produto_escolha(produtos),
