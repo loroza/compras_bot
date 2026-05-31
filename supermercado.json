@@ -37,7 +37,7 @@
           "reforcador de lavagem",
           "pastilha para maquina de lavar",
           "perfume para roupas",
-          "lenços captura cor",
+          "lencos captura cor",
           "alvejante roupas brancas"
         ]
       },
@@ -74,7 +74,7 @@
           "papel higienico",
           "papel toalha",
           "guardanapo",
-          "lenço de papel",
+          "lenco de papel",
           "toalha umedecida",
           "saco de lixo pequeno",
           "saco de lixo medio",
@@ -249,37 +249,49 @@
       "bebidas_alcoolicas": {
         "essencial": false,
         "subcategorias": {
-          "cervejas": [
-            "cerveja pilsen",
-            "cerveja puro malte",
-            "cerveja lata",
-            "cerveja long neck",
-            "cerveja artesanal",
-            "cerveja sem alcool"
-          ],
-          "vinhos": [
-            "vinho tinto",
-            "vinho branco",
-            "vinho rose",
-            "vinho suave",
-            "vinho seco",
-            "espumante",
-            "champagne"
-          ],
-          "destilados": [
-            "vodka",
-            "whisky",
-            "rum",
-            "gin",
-            "tequila",
-            "cachaca",
-            "licor"
-          ],
-          "prontos_para_beber": [
-            "drink pronto lata",
-            "ice bebida alcoolica",
-            "coquetel pronto"
-          ]
+          "cervejas": {
+            "essencial": false,
+            "produtos": [
+              "cerveja pilsen",
+              "cerveja puro malte",
+              "cerveja lata",
+              "cerveja long neck",
+              "cerveja artesanal",
+              "cerveja sem alcool"
+            ]
+          },
+          "vinhos": {
+            "essencial": false,
+            "produtos": [
+              "vinho tinto",
+              "vinho branco",
+              "vinho rose",
+              "vinho suave",
+              "vinho seco",
+              "espumante",
+              "champagne"
+            ]
+          },
+          "destilados": {
+            "essencial": false,
+            "produtos": [
+              "vodka",
+              "whisky",
+              "rum",
+              "gin",
+              "tequila",
+              "cachaca",
+              "licor"
+            ]
+          },
+          "prontos_para_beber": {
+            "essencial": false,
+            "produtos": [
+              "drink pronto lata",
+              "ice bebida alcoolica",
+              "coquetel pronto"
+            ]
+          }
         }
       },
       "bebidas_funcionais": {
@@ -300,30 +312,31 @@
           "xarope para bebidas",
           "mistura para drinks",
           "agua tonica",
-          "agua sabor limao",
+          "agua com gas saborizada",
           "bebida gaseificada artesanal"
         ]
       }
     }
   },
   "carnes": {
-    "grupos": {
+    "subcategorias": {
       "bovinos": {
         "essencial": true,
         "produtos": [
           "alcatra",
           "contra file",
-          "patinho (moido ou bife)",
+          "patinho",
           "coxao mole",
           "coxao duro",
-          "acem (moido ou panela)",
+          "acem",
           "musculo",
           "fraldinha",
           "maminha",
           "picanha",
           "cupim",
           "costela bovina",
-          "carne de sol / charque",
+          "carne de sol",
+          "charque",
           "figado bovino"
         ]
       },
@@ -332,20 +345,20 @@
         "produtos": [
           "bisteca suina",
           "lombo suino",
-          "pernil (cubos ou peca)",
+          "pernil",
           "paleta suina",
           "picanha suina",
-          "costelinha suina fresca",
-          "file suino/suan"
+          "costelinha suina",
+          "file suino"
         ]
       },
       "aves": {
         "essencial": true,
         "produtos": [
-          "filé de peito de frango",
-          "sobrecoxa (com ou sem osso)",
+          "file de peito de frango",
+          "sobrecoxa de frango",
           "frango inteiro",
-          "asa de frango (tulipa)",
+          "asa de frango",
           "coxinha da asa",
           "coracao de frango",
           "sassami",
@@ -356,15 +369,19 @@
       "processados_e_embutidos": {
         "essencial": false,
         "produtos": [
-          "linguica toscana (churrasco)",
+          "linguica toscana",
           "linguica calabresa",
           "linguica de frango",
-          "linguica fina / mista",
+          "linguica fina",
           "salsicha hot dog",
-          "bacon (cubos ou fatias)",
+          "bacon em cubos",
+          "bacon fatiado",
           "paio",
-          "hamburguer (bovino/frango/vegetal)",
-          "nuggets / empanados",
+          "hamburguer bovino",
+          "hamburguer de frango",
+          "hamburguer vegetal",
+          "nuggets",
+          "empanados",
           "pao de alho"
         ]
       }
@@ -372,40 +389,45 @@
   },
   "comidas_prontas_e_congelados": {
     "subcategorias": {
-      "pratos_prontos_individuais": {
+      "pratos_prontos": {
         "essencial": false,
         "produtos": [
-          "lasanha congelada (carne/queijo/frango)",
-          "escondidinho (carne seca/frango)",
+          "lasanha congelada de carne",
+          "lasanha congelada de queijo",
+          "lasanha congelada de frango",
+          "escondidinho de carne seca",
+          "escondidinho de frango",
           "parmegiana congelada",
           "strogonoff congelado",
           "marmita fit pronta",
           "yakisoba congelado",
-          "macarrao instantaneo (cup noodles)"
+          "macarrao instantaneo"
         ]
       },
       "lanches_e_petiscos": {
         "essencial": false,
         "produtos": [
           "pizza congelada",
-          "pao de queijo (pacote)",
-          "nuggets / empanados de frango",
-          "steak de frango",
+          "pao de queijo congelado",
+          "nuggets congelado",
+          "steak de frango congelado",
           "hamburguer congelado",
-          "salgadinhos de festa (coxinha/kibe/bolinha de queijo)",
+          "coxinha congelada",
+          "kibe congelado",
+          "bolinha de queijo congelada",
           "folhado congelado",
-          "burrito / hot pocket"
+          "burrito congelado"
         ]
       },
       "acompanhamentos_congelados": {
         "essencial": false,
         "produtos": [
           "batata frita palito",
-          "batata rustica / carinha",
+          "batata rustica",
           "aneis de cebola",
           "mandioca congelada",
           "polenta palito",
-          "vegetais seletos (mix cenoura, ervilha, milho)",
+          "mix de legumes congelado",
           "brocolis congelado",
           "couve-flor congelada"
         ]
@@ -413,29 +435,31 @@
       "sobremesas_congeladas": {
         "essencial": false,
         "produtos": [
-          "sorvete de massa (pote)",
+          "sorvete de massa pote",
           "picole",
-          "açai (pote)",
+          "acai pote",
           "torta holandesa congelada",
           "petit gateau pronto",
-          "frutas congeladas (morango/frutas vermelhas)"
+          "morango congelado",
+          "frutas vermelhas congeladas"
         ]
       },
-      "massas_frescas_refrigeradas": {
-        "essencial": true,
+      "massas_frescas": {
+        "essencial": false,
         "produtos": [
           "massa de lasanha fresca",
           "massa de pastel",
           "massa de pizza pronta",
           "nhoque fresco",
-          "ravioli / capeletti fresco",
+          "ravioli fresco",
+          "capeletti fresco",
           "massa de panqueca pronta"
         ]
       }
     }
   },
   "frios_leites_e_derivados": {
-    "grupos": {
+    "subcategorias": {
       "leites_e_bebidas": {
         "essencial": true,
         "produtos": [
@@ -445,8 +469,8 @@
           "leite zero lactose",
           "leite em po",
           "achocolatado liquido",
-          "bebida lactea / vitamina",
-          "leite de coco (culinario)"
+          "bebida lactea",
+          "leite de coco culinario"
         ]
       },
       "iogurtes_e_sobremesas_lacteas": {
@@ -455,10 +479,12 @@
           "iogurte natural",
           "iogurte com frutas",
           "iogurte grego",
-          "iogurte liquido (garrafao)",
-          "petit suisse (tipo danoninho)",
-          "chamyto / yakult",
-          "sobremesa de chocolate / flan",
+          "iogurte liquido",
+          "petit suisse",
+          "yakult",
+          "chamyto",
+          "sobremesa de chocolate",
+          "flan",
           "coalhada"
         ]
       },
@@ -467,18 +493,20 @@
         "produtos": [
           "mussarela fatiada",
           "queijo prato",
-          "queijo branco / minas frescal",
+          "queijo minas frescal",
           "queijo ricota",
           "queijo coalho",
-          "queijo parmesao (peca ou ralado)",
+          "queijo parmesao ralado",
+          "queijo parmesao peca",
           "queijo provolone",
           "queijo gorgonzola",
-          "queijo cheddar (fatiado ou bisnaga)",
+          "queijo cheddar fatiado",
+          "queijo cheddar bisnaga",
           "cream cheese",
           "requeijao cremoso"
         ]
       },
-      "frios_e_embutidos_fatiados": {
+      "frios_e_embutidos": {
         "essencial": true,
         "produtos": [
           "presunto cozido",
@@ -486,14 +514,15 @@
           "peito de peru",
           "blanquet de peru",
           "mortadela tradicional",
-          "mortadela defumada / italiana",
-          "salame / salaminho",
+          "mortadela defumada",
+          "salame",
+          "salaminho",
           "lombo defumado",
           "copa",
           "pate pronto"
         ]
       },
-      "manteigas_e_gorduras_lacteas": {
+      "manteigas_e_gorduras": {
         "essencial": true,
         "produtos": [
           "manteiga com sal",
@@ -528,31 +557,30 @@
           "hidratante para os pes",
           "desodorante spray",
           "desodorante roll-on",
-          "desodorante stick / barra",
+          "desodorante stick",
           "desodorante sem perfume",
           "talco corporal",
           "protetor solar corporal",
           "pos-sol",
-          "esponja de banho",
-          "esponja de limpeza profunda"
+          "esponja de banho"
         ]
       },
       "cuidados_com_o_rosto": {
         "essencial": false,
         "produtos": [
-          "sabonete facial barra",
-          "sabonete facial liquido",
+          "sabonete facial",
           "gel de limpeza facial",
-          "tônico facial",
+          "tonico facial",
           "agua micelar",
-          "hidratante facial dia (com fps)",
+          "hidratante facial dia",
           "hidratante facial noite",
           "protetor solar facial",
-          "serum facial (vitamina c/ácido hialuronico)",
-          "mascara facial (argila/sheet mask)",
+          "serum vitamina c",
+          "serum acido hialuronico",
+          "mascara facial de argila",
           "esfoliante facial",
-          "creme para a area dos olhos",
-          "protetor labial / lip balm",
+          "creme para area dos olhos",
+          "protetor labial",
           "demaquilante",
           "lencos demaquilantes"
         ]
@@ -569,10 +597,9 @@
           "refil escova eletrica",
           "fio dental",
           "fita dental",
-          "enxaguante bucal (com ou sem alcool)",
+          "enxaguante bucal",
           "limpador de lingua",
-          "escova interdental",
-          "fixador de dentadura / protese"
+          "escova interdental"
         ]
       },
       "cuidados_com_o_cabelo": {
@@ -582,16 +609,19 @@
           "shampoo anti-caspa",
           "shampoo matizador",
           "condicionador",
-          "mascara de hidratacao / nutricao",
-          "creme para pentear / ativador de cachos",
+          "mascara de hidratacao",
+          "creme para pentear",
+          "ativador de cachos",
           "leave-in",
-          "oleo capilar / reparador de pontas",
+          "oleo capilar",
+          "reparador de pontas",
           "gel de cabelo",
           "pomada modeladora",
-          "spray fixador (laque)",
+          "spray fixador",
           "ampola de tratamento",
           "shampoo a seco",
-          "tintura para cabelo / tonalizante",
+          "tintura para cabelo",
+          "tonalizante",
           "agua oxigenada",
           "po descolorante"
         ]
@@ -603,9 +633,9 @@
           "absorvente sem abas",
           "absorvente noturno",
           "absorvente interno",
-          "protetor diario (carefree)",
+          "protetor diario",
           "sabonete intimo liquido",
-          "lenço umedecido intimo",
+          "lenco umedecido intimo",
           "coletor menstrual",
           "disco menstrual"
         ]
@@ -614,14 +644,14 @@
         "essencial": true,
         "produtos": [
           "lamina de barbear descartavel",
-          "aparelho de barbear / depilar",
-          "carga para aparelho (par)",
+          "aparelho de barbear",
+          "carga para aparelho",
           "espuma de barbear",
           "gel de barbear",
-          "pos-barba (locao ou gel)",
+          "pos-barba",
           "creme depilatorio",
           "folhas de cera fria",
-          "cera quente (microondas)",
+          "cera quente microondas",
           "aparador de pelos eletrico"
         ]
       },
@@ -630,13 +660,14 @@
         "produtos": [
           "algodao em bola",
           "algodao em disco",
-          "hastes flexiveis (cotonetes)",
-          "acetona / removedor de esmalte",
-          "esmalte (cores variadas)",
+          "hastes flexiveis",
+          "acetona",
+          "removedor de esmalte",
+          "esmalte",
           "base de unha",
-          "extra brilho / top coat",
+          "extra brilho top coat",
           "lixa de unha",
-          "cortador de unha / alicate",
+          "cortador de unha",
           "oleo de cuticula"
         ]
       }
@@ -649,102 +680,65 @@
         "produtos": [
           "abacate",
           "abacaxi",
-          "abiu",
           "acerola",
           "ameixa nacional",
           "ameixa importada",
           "amora",
-          "atemoia",
           "avocado",
           "banana prata",
           "banana nanica",
           "banana da terra",
           "banana maca",
           "banana ouro",
-          "bacuri",
-          "biriba",
           "caju",
-          "caqui chocolate",
-          "caqui fuyu",
-          "caqui rama forte",
+          "caqui",
           "carambola",
-          "castanha",
           "cereja",
           "coco verde",
           "coco seco",
-          "cupuaçu",
           "damasco",
           "figo",
           "framboesa",
-          "fruta do conde",
           "goiaba branca",
           "goiaba vermelha",
           "graviola",
-          "groselha",
           "jabuticaba",
-          "jaca",
-          "jambo",
-          "janaguba",
-          "juran",
-          "kiwi nacional",
-          "kiwi gold",
+          "kiwi",
           "laranja pera",
           "laranja lima",
           "laranja bahia",
-          "laranja kinkan",
-          "laranja seleta",
-          "lichia",
           "limao taiti",
           "limao siciliano",
           "limao galego",
-          "limao cravo",
           "maca gala",
           "maca fuji",
           "maca verde",
-          "maca argentina",
           "mamao papaia",
           "mamao formosa",
           "manga palmer",
           "manga rosa",
-          "manga haden",
           "manga espada",
-          "manga keitt",
           "maracuja azedo",
           "maracuja doce",
-          "marmelo",
           "melancia",
-          "melancia baby",
           "melao amarelo",
           "melao cantaloupe",
-          "melao orange",
-          "melao pele de sapo",
           "mirtilo",
           "morango",
           "nectarina",
-          "nespera",
-          "nêspera (ameixa amarela)",
-          "pequi",
           "pessego",
           "physalis",
-          "pinha",
-          "pitanga",
           "pitaya rosa",
           "pitaya branca",
           "pitaya amarela",
-          "roma",
-          "seriguela",
-          "tâmara",
-          "tamarindo",
           "tangerina murcote",
           "tangerina ponkan",
           "tangerina cravo",
-          "tangerina decopon",
           "uva thompson",
           "uva crimson",
           "uva italia",
           "uva vitoria",
-          "uva niagara",
-          "uva nubia"
+          "uva niagara"
         ]
       },
       "verduras_e_folhas": {
@@ -757,12 +751,9 @@
           "alface lisa",
           "alface roxa",
           "alface romana",
-          "alface mimosa",
           "almeirao",
-          "alcaparra",
           "aspargos",
           "brocolis comum",
-          "brocolis ninja",
           "brocolis ramoso",
           "cebolinha",
           "chicoria",
@@ -778,36 +769,31 @@
           "manjericao",
           "manjerona",
           "mostarda",
-          "ora-pro-nobis",
           "radicchio",
           "repolho verde",
           "repolho roxo",
           "rucula",
           "salsa",
-          "salvia",
-          "taioba",
           "tomilho"
         ]
       },
       "legumes_e_vegetais": {
         "essencial": true,
         "produtos": [
-          "abobora cabotiá",
+          "abobora cabotica",
           "abobora moranga",
           "abobora paulista",
           "abobrinha italiana",
           "abobrinha menina",
-          "aho poró",
           "alcachofra",
           "alho",
           "batata inglesa",
           "batata doce",
           "batata baroa",
           "batata asterix",
-          "batata yacon",
           "berinjela",
           "beterraba",
-          "cará",
+          "cara",
           "cenoura",
           "cenoura baby",
           "cogumelo paris",
@@ -819,16 +805,14 @@
           "ervilha torta",
           "fava",
           "gengibre",
-          "grao de bico fresco",
           "inhame",
           "jilo",
           "mandioca",
           "maxixe",
-          "milho verde (espiga)",
+          "milho verde",
           "palmito",
           "pepino japones",
           "pepino comum",
-          "pepino caipira",
           "pimentao verde",
           "pimentao amarelo",
           "pimentao vermelho",
@@ -868,7 +852,7 @@
           "arroz branco",
           "arroz integral",
           "arroz parboilizado",
-          "arroz arbóreo (risoto)",
+          "arroz arboreo",
           "arroz jasmim",
           "feijao carioca",
           "feijao preto",
@@ -881,14 +865,14 @@
           "soja em grao",
           "farinha de trigo",
           "farinha de mandioca",
-          "farinha de milho (fuba)",
+          "farinha de milho",
           "farinha de rosca",
           "farinha de aveia",
           "farinha de arroz",
           "polvilho doce",
           "polvilho azedo",
-          "tapioca (goma pronta)",
-          "cuscuz (flocao de milho)",
+          "tapioca",
+          "cuscuz",
           "quinoa"
         ]
       },
@@ -896,19 +880,18 @@
         "essencial": true,
         "produtos": [
           "macarrao espaguete",
-          "macarrao parafuso (fusilli)",
-          "macarrao pena (penne)",
+          "macarrao parafuso",
+          "macarrao pena",
           "macarrao ninho",
           "macarrao padre nosso",
           "macarrao para lasanha",
           "macarrao integral",
-          "macarrao instantaneo (miojo)",
-          "macarrao de arroz (bifum)",
-          "canelone",
-          "nhoque (massa seca)"
+          "macarrao instantaneo",
+          "macarrao de arroz",
+          "canelone"
         ]
       },
-      "óleos_gorduras_e_molhos": {
+      "oleos_gorduras_e_molhos": {
         "essencial": true,
         "produtos": [
           "oleo de soja",
@@ -919,19 +902,19 @@
           "azeite de oliva tipo unico",
           "vinagre de alcool",
           "vinagre de maca",
-          "vinagre vinagre balsamico",
-          "molho de tomate (sachê/lata)",
+          "vinagre balsamico",
+          "molho de tomate",
           "extrato de tomate",
           "passata de tomate",
           "ketchup",
           "maionese",
           "mostarda",
           "molho shoyu",
-          "molho inglês",
+          "molho ingles",
           "molho de pimenta",
           "molho barbecue",
           "molho para salada",
-          "leite de coco"
+          "leite de coco culinario"
         ]
       },
       "temperos_e_condimentos": {
@@ -946,17 +929,19 @@
           "acucar mascavo",
           "adocante liquido",
           "adocante em po",
-          "caldo de galinha/carne (cubo)",
-          "tempero pronto (pote)",
+          "caldo de galinha cubo",
+          "caldo de carne cubo",
+          "tempero pronto",
           "pimenta do reino",
           "oregano",
-          "canela em po/pau",
+          "canela em po",
+          "canela em pau",
           "cravo da india",
           "noz moscada",
           "curry",
-          "paprica doce/defumada",
+          "paprica doce",
+          "paprica defumada",
           "cominho",
-          "ajinomoto",
           "bicarbonato de sodio",
           "fermento quimico em po",
           "fermento biologico seco"
@@ -965,19 +950,22 @@
       "conservas_e_enlatados": {
         "essencial": false,
         "produtos": [
-          "milho verde",
-          "ervilha",
-          "dueto (milho e ervilha)",
+          "milho verde enlatado",
+          "ervilha enlatada",
+          "dueto milho e ervilha",
           "seleta de legumes",
-          "atum ralado/inteiro",
-          "sardinha em oleo/molho",
+          "atum ralado",
+          "atum inteiro",
+          "sardinha em oleo",
+          "sardinha em molho",
           "palmito em conserva",
-          "azeitona verde com/sem caroco",
+          "azeitona verde com caroco",
+          "azeitona verde sem caroco",
           "azeitona preta",
-          "champignon / cogumelo em conserva",
+          "champignon em conserva",
           "picles",
-          "grão de bico em conserva",
-          "feijão em lata",
+          "grao de bico em conserva",
+          "feijao em lata",
           "salsicha em lata"
         ]
       },
@@ -986,16 +974,18 @@
         "produtos": [
           "biscoito agua e sal",
           "biscoito maizena",
-          "biscoito recheado chocolate/morango",
+          "biscoito recheado chocolate",
+          "biscoito recheado morango",
           "biscoito wafer",
           "biscoito cream cracker",
           "biscoito de polvilho",
           "cookies",
-          "batata chips / palha",
+          "batata chips",
+          "batata palha",
           "salgadinho de pacote",
           "amendoim torrado",
           "pipoca de microondas",
-          "milho para pipoca comum"
+          "milho para pipoca"
         ]
       },
       "matinal_e_sobremesa": {
@@ -1003,16 +993,18 @@
         "produtos": [
           "cafe moido",
           "cafe soluvel",
-          "cha em sachê",
+          "cha em sache",
           "achocolatado em po",
-          "chocolate em po / cacau",
-          "gelatina (diversos sabores)",
+          "chocolate em po",
+          "cacau em po",
+          "gelatina",
           "mistura para bolo",
           "aveia em flocos",
-          "cereal matinal / granola",
+          "cereal matinal",
+          "granola",
           "mel",
           "geleia de frutas",
-          "doce de leite (pote)",
+          "doce de leite",
           "goiabada"
         ]
       }
@@ -1027,12 +1019,13 @@
           "pao de sal integral",
           "pao de queijo fresco",
           "pao de batata",
-          "pao de leite / bisnaguinha fresca",
+          "pao de leite fresco",
+          "bisnaguinha fresca",
           "pao de milho",
           "pao australiano",
-          "pao de hambúrguer com gergelim",
+          "pao de hamburguer com gergelim",
           "pao de cachorro-quente",
-          "pao sirio / pita",
+          "pao sirio",
           "baguete italiana",
           "ciabatta"
         ]
@@ -1041,14 +1034,15 @@
         "essencial": true,
         "produtos": [
           "pao de forma branco",
-          "pao de forma integral / multigraos",
+          "pao de forma integral",
+          "pao de forma multigraos",
           "pao de forma sem casca",
           "pao de forma artesanal",
           "pao sovado de pacote",
           "pao de hot dog pacote",
-          "pao de hambúrguer pacote",
+          "pao de hamburguer pacote",
           "bisnaguinha de pacote",
-          "massa de wrap / tortilla (rap10)"
+          "wrap tortilla"
         ]
       },
       "confeitaria_e_bolos": {
@@ -1056,18 +1050,19 @@
         "produtos": [
           "bolo de cenoura com chocolate",
           "bolo de laranja",
-          "bolo de milho / fuba",
+          "bolo de milho",
           "bolo de chocolate",
           "bolo de pote",
           "fatia de torta doce",
           "torta holandesa",
           "torta de limao",
-          "pudim de leite moça",
-          "mousse de chocolate/maracuja",
+          "pudim de leite",
+          "mousse de chocolate",
+          "mousse de maracuja",
           "quindim",
-          "sonho de creme/doce de leite",
-          "carolina recheada",
-          "donuts / rosquinha doce",
+          "sonho de creme",
+          "sonho de doce de leite",
+          "donuts",
           "brownie",
           "cookie artesanal"
         ]
@@ -1076,13 +1071,17 @@
         "essencial": false,
         "produtos": [
           "coxinha de frango",
-          "kibe frito / assado",
-          "empada de frango/palmito",
+          "kibe frito",
+          "kibe assado",
+          "empada de frango",
+          "empada de palmito",
           "enroladinho de presunto e queijo",
-          "esfiha de carne/frango",
+          "esfiha de carne",
+          "esfiha de frango",
           "pao italiano recheado",
-          "folhado de frango/queijo",
-          "pastel de feira / lanchonete"
+          "folhado de frango",
+          "folhado de queijo",
+          "pastel de feira"
         ]
       },
       "chocolates_e_bomboniere": {
@@ -1092,30 +1091,33 @@
           "barra de chocolate amargo",
           "barra de chocolate branco",
           "caixa de bombom",
-          "bombom individual (sonho de valsa/ouro branco)",
-          "bis / wafer chocolate",
+          "bombom sonho de valsa",
+          "bombom ouro branco",
+          "bis",
+          "wafer chocolate",
           "trufa recheada",
-          "achocolatado em barra",
           "pacoquinha",
           "pe de moleque",
           "chicletes",
-          "balas de goma / frutas",
+          "balas de goma",
           "pirulitos",
           "marshmallow",
           "pastilha de menta"
         ]
       },
-      "sobremesas_geladas_e_diversos": {
+      "sobremesas_geladas": {
         "essencial": false,
         "produtos": [
-          "sorvete de massa (pote 2l)",
-          "sorvete premium / artesanal",
-          "picole de frutas / leite",
+          "sorvete de massa pote 2l",
+          "sorvete premium",
+          "picole de frutas",
+          "picole de leite",
           "conezinho de sorvete",
-          "açai (pote ou balde)",
-          "frutas em calda (pessego/figo)",
-          "doce de corte (goiabada/marmelada)",
-          "chantilly em spray / caixinha"
+          "acai pote",
+          "acai balde",
+          "frutas em calda",
+          "goiabada em calda",
+          "chantilly em spray"
         ]
       }
     }
@@ -1125,74 +1127,79 @@
       "alimentacao_gatos": {
         "essencial": true,
         "produtos": [
-          "racao seca para gatos adultos",
-          "racao seca para gatos castrados",
-          "racao seca para gatos filhotes",
-          "racao seca para gatos idosos (senior)",
-          "racao umida (sachê) - diversos sabores",
-          "racao umida (lata / patê)",
-          "leite substituto para filhotes",
-          "graminha para gatos (cat grass)"
+          "racao seca gatos adultos",
+          "racao seca gatos castrados",
+          "racao seca gatos filhotes",
+          "racao seca gatos idosos",
+          "racao umida sache gatos",
+          "racao umida lata gatos",
+          "leite substituto filhotes",
+          "graminha para gatos"
         ]
       },
       "higiene_e_limpeza_gatos": {
         "essencial": true,
         "produtos": [
-          "areia sanitaria (bentonita)",
+          "areia sanitaria bentonita",
           "areia sanitaria de silica",
-          "areia sanitaria biodegradável (madeira/milho)",
+          "areia sanitaria biodegradavel",
           "tapete coletor de areia",
-          "pa de limpeza para caixa de areia",
+          "pa de limpeza caixa de areia",
           "eliminador de odores enzimatico",
-          "pipicat / aditivo perfumado para areia",
+          "aditivo perfumado para areia",
           "tapete higienico",
           "shampoo para gatos",
           "condicionador para gatos",
-          "banho a seco (spray ou espuma)",
+          "banho a seco pet",
           "lenco umedecido pet"
         ]
       },
-      "saude_e_bem_estar": {
+      "saude_e_bem_estar_pet": {
         "essencial": true,
         "produtos": [
-          "antipulgas e carrapatos (pipeta/comprimido)",
+          "antipulgas pipeta",
+          "antipulgas comprimido",
           "vermicida pet",
           "coleira antipulgas",
           "suplemento vitaminico pet",
-          "pasta para bolas de pelo (malt paste)",
+          "pasta para bolas de pelo",
           "limpa orelhas pet",
-          "limpa lagrimas / colirio pet",
+          "limpa lagrimas pet",
           "pasta de dente pet",
           "escova de dentes pet"
         ]
       },
-      "mimos_e_acessorios": {
+      "mimos_e_acessorios_gatos": {
         "essencial": false,
         "produtos": [
-          "petisco para gatos (dreamies/snacks)",
-          "catnip (erva de gato) - spray ou seca",
+          "petisco para gatos",
+          "catnip spray",
+          "catnip seco",
           "brinquedo de varinha",
-          "bolinha de feltro / plastico",
-          "arranhador de carpete / sisal",
-          "caixa de transporte",
-          "comedouro / bebedouro",
+          "bolinha de feltro",
+          "arranhador de sisal",
+          "caixa de transporte gatos",
+          "comedouro gatos",
+          "bebedouro gatos",
           "fonte de agua eletrica",
-          "coleira e guia",
-          "caminha ou toca",
-          "escova / pente para pelos"
+          "coleira para gatos",
+          "caminha para gatos",
+          "escova para pelos de gatos"
         ]
       },
-      "alimentacao_caes (geral)": {
+      "alimentacao_caes": {
         "essencial": false,
         "produtos": [
-          "racao seca para caes adultos",
-          "racao seca para caes filhotes",
+          "racao seca caes adultos",
+          "racao seca caes filhotes",
           "racao seca racas pequenas",
           "racao seca racas grandes",
-          "sachê para caes",
-          "patê em lata para caes",
-          "biscoito canino / petiscos",
-          "osso de couro / nylon"
+          "sache para caes",
+          "pate em lata para caes",
+          "biscoito canino",
+          "petisco para caes",
+          "osso de couro",
+          "osso de nylon"
         ]
       }
     }
@@ -1202,19 +1209,21 @@
       "primeiros_socorros": {
         "essencial": true,
         "produtos": [
-          "curativo autoadesivo (band-aid)",
+          "curativo autoadesivo",
           "algodao",
           "gaze esterilizada",
-          "esparadrapo / fita micropore",
-          "antisseptico spray / liquido",
+          "esparadrapo",
+          "fita micropore",
+          "antisseptico spray",
+          "antisseptico liquido",
           "soro fisiologico",
           "alcool 70%",
           "alcool em gel",
           "termometro digital",
-          "pomada para assadura / irritacao",
+          "pomada para assadura",
           "pomada para queimadura",
-          "gel de arnica / massagem muscular",
-          "bolsa termica (gel ou borracha)"
+          "gel de arnica",
+          "bolsa termica"
         ]
       },
       "vitaminas_e_suplementos": {
@@ -1224,25 +1233,31 @@
           "vitamina c efervescente",
           "vitamina d",
           "omega 3",
-          "colageno em po / capsula",
-          "whey protein / proteina em po",
+          "colageno em po",
+          "colageno em capsula",
+          "whey protein",
           "creatina",
           "barra de proteina",
           "probiotico",
           "melatonina"
         ]
       },
-      "cuidados_esteticos_e_maquiagem": {
+      "maquiagem": {
         "essencial": false,
         "produtos": [
           "base facial",
           "corretivo",
-          "po compacto / translucido",
-          "blush / iluminador",
-          "rimel / mascara de cilios",
-          "lapis de olho / delineador",
+          "po compacto",
+          "po translucido",
+          "blush",
+          "iluminador",
+          "rimel",
+          "mascara de cilios",
+          "lapis de olho",
+          "delineador",
           "sombra para olhos",
-          "batom / gloss labial",
+          "batom",
+          "gloss labial",
           "fixador de maquiagem",
           "cilios posticos",
           "cola para cilios"
@@ -1252,13 +1267,14 @@
         "essencial": false,
         "produtos": [
           "pincel de maquiagem",
-          "esponja de maquiagem (beauty blender)",
-          "pinça de sobrancelha",
+          "esponja de maquiagem",
+          "pinca de sobrancelha",
           "curvex",
           "escova de cabelo",
           "pente",
-          "elastico de cabelo (rabicó/xuxinha)",
-          "presilha / grampo de cabelo",
+          "elastico de cabelo",
+          "presilha de cabelo",
+          "grampo de cabelo",
           "touca de banho",
           "touca de cetim",
           "espelho de bolsa"
@@ -1269,12 +1285,12 @@
         "produtos": [
           "oleo essencial",
           "sais de banho",
-          "bomba de banho (bath bomb)",
+          "bomba de banho",
           "mascara termica para olhos",
           "tapa olhos para dormir",
-          "protetor auricular (tampao)",
+          "protetor auricular",
           "massageador manual",
-          "incenso / difusor de varetas"
+          "incenso"
         ]
       },
       "saude_sexual": {
@@ -1283,7 +1299,7 @@
           "preservativo masculino",
           "preservativo feminino",
           "lubrificante intimo",
-          "teste de gravidez de farmacia",
+          "teste de gravidez",
           "gel estimulante"
         ]
       }

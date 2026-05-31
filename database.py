@@ -8,136 +8,143 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 async def get_conn():
     return await asyncpg.connect(DATABASE_URL)
 
-# ─── INIT ────────────────────────────────────────────────
+# ─── DEPARTAMENTOS ────
 
-async def init_db():
+async def listar_departamentos():
     conn = await get_conn()
-    await conn.execute("""
-        CREATE TABLE IF NOT EXISTS carrinho (
-            id SERIAL PRIMARY KEY,
-            item_nome TEXT,
-            quantidade REAL,
-            valor_unitario REAL,
-            adicionado_por BIGINT
-        );
-        CREATE TABLE IF NOT EXISTS listas (
-            id SERIAL PRIMARY KEY,
-            nome TEXT UNIQUE
-        );
-        CREATE TABLE IF NOT EXISTS lista_itens (
-            id SERIAL PRIMARY KEY,
-            lista_id INTEGER REFERENCES listas(id) ON DELETE CASCADE,
-            item_nome TEXT
-        );
-        CREATE TABLE IF NOT EXISTS historico_compras (
-            id SERIAL PRIMARY KEY,
-            data TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            lista_nome TEXT,
-            mercado TEXT,
-            total REAL
-        );
-        CREATE TABLE IF NOT EXISTS historico_itens (
-            id SERIAL PRIMARY KEY,
-            compra_id INTEGER REFERENCES historico_compras(id),
-            item_nome TEXT,
-            quantidade REAL,
-            valor_unitario REAL
-        );
-    """)
-    await conn.close()
-
-# ─── CARRINHO ────────────────────────────────────────────
-
-async def adicionar_ao_carrinho(user_id, nome, qtd, valor):
-    conn = await get_conn()
-    await conn.execute(
-        "INSERT INTO carrinho (item_nome, quantidade, valor_unitario, adicionado_por) VALUES ($1, $2, $3, $4)",
-        nome, qtd, valor, user_id
-    )
-    await conn.close()
-
-async def pegar_carrinho():
-    conn = await get_conn()
-    rows = await conn.fetch("SELECT * FROM carrinho")
+    rows = await conn.fetch("SELECT * FROM departamentos WHERE ativo = TRUE ORDER BY id")
     await conn.close()
     return rows
 
-async def limpar_carrinho(user_id=None):
+async def buscar_departamento(id_dep):
     conn = await get_conn()
-    await conn.execute("DELETE FROM carrinho")
+    row = await conn.fetchrow("SELECT * FROM departamentos WHERE id = $1", id_dep)
     await conn.close()
+    return row
 
-# ─── LISTAS ──────────────────────────────────────────────
+# ─── CATEGORIAS ────
 
-async def criar_lista(nome):
+async def criar_categoria(dep_id, nome, emoji='🏷️'):
     conn = await get_conn()
     try:
-        await conn.execute("INSERT INTO listas (nome) VALUES ($1)", nome)
-        await conn.close()
-        return True
-    except Exception:
-        await conn.close()
-        return False
-
-async def adicionar_item_lista(lista_nome, item_nome):
-    conn = await get_conn()
-    res = await conn.fetchrow("SELECT id FROM listas WHERE nome = $1", lista_nome)
-    if res:
         await conn.execute(
-            "INSERT INTO lista_itens (lista_id, item_nome) VALUES ($1, $2)",
-            res["id"], item_nome
+            "INSERT INTO categorias (departamento_id, nome, emoji) VALUES ($1, $2, $3)",
+            dep_id, nome, emoji
         )
+        return True
+    except:
+        return False
+    finally:
+        await conn.close()
+
+async def listar_categorias(dep_id):
+    conn = await get_conn()
+    rows = await conn.fetch("SELECT * FROM categorias WHERE departamento_id = $1 ORDER BY nome", dep_id)
+    await conn.close()
+    return rows
+
+async def deletar_categoria(cat_id):
+    conn = await get_conn()
+    await conn.execute("DELETE FROM categorias WHERE id = $1", cat_id)
     await conn.close()
 
-async def pegar_listas_disponiveis():
-    conn = await get_conn()
-    rows = await conn.fetch("SELECT nome FROM listas")
-    await conn.close()
-    return [r["nome"] for r in rows]
+# ─── PRODUTOS ────
 
-async def pegar_itens_da_lista(nome_lista):
+async def criar_produto(dep_id, nome, cat_id=None):
     conn = await get_conn()
-    rows = await conn.fetch("""
-        SELECT li.item_nome FROM lista_itens li
-        JOIN listas l ON l.id = li.lista_id
-        WHERE l.nome = $1
-    """, nome_lista)
+    try:
+        await conn.execute(
+            "INSERT INTO produtos (departamento_id, nome, categoria_id) VALUES ($1, $2, $3)",
+            dep_id, nome, cat_id
+        )
+        return True
+    except:
+        return False
+    finally:
+        await conn.close()
+
+async def listar_produtos(dep_id):
+    conn = await get_conn()
+    rows = await conn.fetch("SELECT * FROM produtos WHERE departamento_id = $1 ORDER BY nome", dep_id)
+    await conn.close()
+    return rows
+
+async def deletar_produto(prod_id):
+    conn = await get_conn()
+    await conn.execute("DELETE FROM produtos WHERE id = $1", prod_id)
+    await conn.close()
+
+# ─── CARRINHO ────
+
+async def adicionar_ao_carrinho(user_id, dep_id, nome, qtd, valor):
+    conn = await get_conn()
+    await conn.execute(
+        "INSERT INTO carrinho (adicionado_por, departamento_id, item_nome, quantidade, valor_unitario) VALUES ($1, $2, $3, $4, $5)",
+        user_id, dep_id, nome, qtd, valor
+    )
+    await conn.close()
+
+async def pegar_carrinho(user_id, dep_id):
+    conn = await get_conn()
+    rows = await conn.fetch("SELECT * FROM carrinho WHERE adicionado_por = $1 AND departamento_id = $2", user_id, dep_id)
+    await conn.close()
+    return rows
+
+async def limpar_carrinho(user_id, dep_id):
+    conn = await get_conn()
+    await conn.execute("DELETE FROM carrinho WHERE adicionado_por = $1 AND departamento_id = $2", user_id, dep_id)
+    await conn.close()
+
+# ─── LISTAS ────
+
+async def criar_lista(dep_id, nome, tipo='avulsa'):
+    conn = await get_conn()
+    try:
+        await conn.execute("INSERT INTO listas (departamento_id, nome, tipo) VALUES ($1, $2, $3)", dep_id, nome, tipo)
+        return True
+    except:
+        return False
+    finally:
+        await conn.close()
+
+async def adicionar_item_lista(lista_id, item_nome):
+    conn = await get_conn()
+    await conn.execute("INSERT INTO lista_itens (lista_id, item_nome) VALUES ($1, $2)", lista_id, item_nome)
+    await conn.close()
+
+async def pegar_listas_disponiveis(dep_id):
+    conn = await get_conn()
+    rows = await conn.fetch("SELECT * FROM listas WHERE departamento_id = $1", dep_id)
+    await conn.close()
+    return rows
+
+async def pegar_itens_da_lista(lista_id):
+    conn = await get_conn()
+    rows = await conn.fetch("SELECT item_nome FROM lista_itens WHERE lista_id = $1", lista_id)
     await conn.close()
     return [r["item_nome"] for r in rows]
 
-async def remover_item_lista(lista_nome, item_nome):
+async def remover_item_lista(lista_id, item_nome):
     conn = await get_conn()
-    res = await conn.fetchrow("SELECT id FROM listas WHERE nome = $1", lista_nome)
-    if res:
-        await conn.execute(
-            "DELETE FROM lista_itens WHERE item_nome = $1 AND lista_id = $2",
-            item_nome, res["id"]
-        )
+    await conn.execute("DELETE FROM lista_itens WHERE item_nome = $1 AND lista_id = $2", item_nome, lista_id)
     await conn.close()
 
-async def deletar_lista(nome):
+async def deletar_lista(lista_id):
     conn = await get_conn()
-    res = await conn.fetchrow("SELECT id FROM listas WHERE nome = $1", nome)
-    if res:
-        await conn.execute("DELETE FROM lista_itens WHERE lista_id = $1", res["id"])
-        await conn.execute("DELETE FROM listas WHERE id = $1", res["id"])
-        await conn.close()
-        return True
+    await conn.execute("DELETE FROM listas WHERE id = $1", lista_id)
     await conn.close()
-    return False
 
-# ─── HISTÓRICO ───────────────────────────────────────────
+# ─── HISTÓRICO ────
 
-async def salvar_historico(lista_nome, mercado, itens_comprados_dict, total):
+async def salvar_historico(dep_id, lista_nome, mercado, itens_detalhe, total):
     conn = await get_conn()
     compra_id = await conn.fetchval(
-        "INSERT INTO historico_compras (lista_nome, mercado, total) VALUES ($1, $2, $3) RETURNING id",
-        lista_nome, mercado, total
+        "INSERT INTO historico_compras (departamento_id, lista_nome, mercado, total) VALUES ($1, $2, $3, $4) RETURNING id",
+        dep_id, lista_nome, mercado, total
     )
-    for item in itens_comprados_dict:
+    for item in itens_detalhe:
         await conn.execute(
             "INSERT INTO historico_itens (compra_id, item_nome, quantidade, valor_unitario) VALUES ($1, $2, $3, $4)",
             compra_id, item["nome"], item["quantidade"], item["valor_unitario"]
         )
     await conn.close()
-    return compra_id

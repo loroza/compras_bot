@@ -1,87 +1,197 @@
 import asyncio
 import os
+
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
-from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
+from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
 from dotenv import load_dotenv
-import listas
 
 import database
 import catalogo
+import listas
+import categorias
+import produtos
 
 load_dotenv()
 bot = Bot(token=os.getenv("BOT_TOKEN"))
 dp = Dispatcher()
 
+
+class MainState(StatesGroup):
+    escolhendo_departamento = State()
+    menu_principal = State()
+    finalizando_mercado = State()
+
+
 class ShopState(StatesGroup):
     navegando = State()
     quantidade = State()
     valor = State()
-    finalizando_mercado = State()
+
+
+def kb_departamentos(departamentos):
+    btns = []
+    for dep in departamentos:
+        texto = f"{dep['emoji']} {dep['nome']}" if dep["emoji"] else dep["nome"]
+        btns.append([KeyboardButton(text=texto)])
+    return ReplyKeyboardMarkup(keyboard=btns, resize_keyboard=True)
+
+
+def kb_menu_principal():
+    return ReplyKeyboardMarkup(keyboard=[
+        [KeyboardButton(text="🛒 Compras"), KeyboardButton(text="📲 Cadastros")],
+        [KeyboardButton(text="🏁 Finalizar")]
+    ], resize_keyboard=True)
+
+
+def kb_menu_compras():
+    return ReplyKeyboardMarkup(keyboard=[
+        [KeyboardButton(text="🛒 Compra Avulsa"), KeyboardButton(text="📋 Minhas Listas")],
+        [KeyboardButton(text="📦 Ver Carrinho")],
+        [KeyboardButton(text="⬅️ Menu Principal")]
+    ], resize_keyboard=True)
+
+
+def kb_menu_cadastros():
+    return ReplyKeyboardMarkup(keyboard=[
+        [KeyboardButton(text="🏷️ Categorias"), KeyboardButton(text="📋 Listas")],
+        [KeyboardButton(text="📦 Produtos")],
+        [KeyboardButton(text="⬅️ Menu Principal")]
+    ], resize_keyboard=True)
+
 
 def kb_opcoes(lista, voltar=True):
     btns = [[KeyboardButton(text=catalogo.formatar(opt))] for opt in lista]
-    if voltar: btns.append([KeyboardButton(text="⬅️ Voltar")])
+    if voltar:
+        btns.append([KeyboardButton(text="⬅️ Voltar")])
     btns.append([KeyboardButton(text="❌ Cancelar")])
     return ReplyKeyboardMarkup(keyboard=btns, resize_keyboard=True)
 
-def kb_nova_compra():
-    return ReplyKeyboardMarkup(keyboard=[
-        [KeyboardButton(text="🆕 Nova Compra")]
-    ], resize_keyboard=True)
 
-def kb_menu():
-    return ReplyKeyboardMarkup(keyboard=[
-        [KeyboardButton(text="🛒 Compra Avulsa"), KeyboardButton(text="📋 Minhas Listas")],
-        [KeyboardButton(text="📦 Ver Carrinho"), KeyboardButton(text="🏁 Finalizar")]
-    ], resize_keyboard=True)
-
-async def extrato_carrinho(message: types.Message):
-    itens = await database.pegar_carrinho()
+async def extrato_carrinho(message: types.Message, dep_id: int):
+    itens = await database.pegar_carrinho(message.from_user.id, dep_id)
     if not itens:
         return
+
     texto = "🛒 *Carrinho atual:*\n\n"
     total = 0
     for item in itens:
-        sub = item['quantidade'] * item['valor_unitario']
+        sub = item["quantidade"] * item["valor_unitario"]
         total += sub
         texto += f"• {item['item_nome']}: {item['quantidade']}x R${item['valor_unitario']:.2f} = R${sub:.2f}\n"
     texto += f"\n💰 *Total: R${total:.2f}*"
     await message.answer(texto, parse_mode="Markdown")
 
-@dp.message(CommandStart())
-async def start(message: types.Message):
-    await database.init_db()
-    await message.answer(
-        "👋 Olá! Bem-vindo ao *Bot de Compras*!\n\nPronto para começar?",
-        parse_mode="Markdown",
-        reply_markup=kb_nova_compra()
+
+async def get_dep_data(state: FSMContext):
+    data = await state.get_data()
+    return (
+        data.get("departamento_id"),
+        data.get("departamento_nome"),
+        data.get("departamento_emoji"),
+        data.get("catalogo_json")
     )
 
-@dp.message(F.text == "🆕 Nova Compra")
-async def nova_compra(message: types.Message, state: FSMContext):
+
+@dp.message(CommandStart())
+async def start(message: types.Message, state: FSMContext):
+    await database.init_db()
+    deps = await database.listar_departamentos()
+
+    if not deps:
+        return await message.answer("Nenhum departamento encontrado no banco.")
+
     await state.clear()
-    await database.limpar_carrinho(message.from_user.id)
-    await message.answer("🛒 *Nova compra iniciada!*\nO que deseja fazer?", parse_mode="Markdown", reply_markup=kb_menu())
+    await state.set_state(MainState.escolhendo_departamento)
+
+    await message.answer(
+        "🏬 Escolha o departamento:",
+        reply_markup=kb_departamentos(deps)
+    )
+
+
+@dp.message(MainState.escolhendo_departamento)
+async def escolher_departamento(message: types.Message, state: FSMContext):
+    deps = await database.listar_departamentos()
+
+    escolhido = None
+    for dep in deps:
+        texto_botao = f"{dep['emoji']} {dep['nome']}" if dep["emoji"] else dep["nome"]
+        if message.text == texto_botao or message.text == dep["nome"]:
+            escolhido = dep
+            break
+
+    if not escolhido:
+        return await message.answer("Escolha um departamento válido.")
+
+    catalogo.carregar_catalogo_dep(escolhido["catalogo_json"])
+
+    await state.update_data(
+        departamento_id=escolhido["id"],
+        departamento_nome=escolhido["nome"],
+        departamento_emoji=escolhido["emoji"],
+        catalogo_json=escolhido["catalogo_json"]
+    )
+    await state.set_state(MainState.menu_principal)
+
+    await message.answer(
+        f"✅ Departamento *{escolhido['nome']}* selecionado.\n\nO que deseja fazer?",
+        parse_mode="Markdown",
+        reply_markup=kb_menu_principal()
+    )
+
+
+@dp.message(F.text == "🛒 Compras")
+async def abrir_compras(message: types.Message):
+    await message.answer("🛒 Menu de Compras:", reply_markup=kb_menu_compras())
+
+
+@dp.message(F.text == "📲 Cadastros")
+async def abrir_cadastros(message: types.Message):
+    await message.answer("📲 Menu de Cadastros:", reply_markup=kb_menu_cadastros())
+
+
+@dp.message(F.text == "⬅️ Menu Principal")
+async def voltar_menu_principal(message: types.Message):
+    await message.answer("Menu principal:", reply_markup=kb_menu_principal())
+
 
 @dp.message(F.text == "🛒 Compra Avulsa")
 async def start_buy(message: types.Message, state: FSMContext):
+    dep_id, dep_nome, _, _ = await get_dep_data(state)
+    if not dep_id:
+        return await message.answer("Envie /start e escolha um departamento primeiro.")
+
     await state.set_state(ShopState.navegando)
-    await state.update_data(caminho=[])
+    await state.update_data(caminho=[], departamento_id=dep_id)
+
+    await database.limpar_carrinho(message.from_user.id, dep_id)
+
+    if not catalogo.CATALOGO:
+        return await message.answer("Esse departamento ainda não possui catálogo configurado.")
+
     opts = list(catalogo.CATALOGO.keys())
-    await message.answer("Escolha a categoria:", reply_markup=kb_opcoes(opts, False))
+    await message.answer(
+        f"🛒 Compra avulsa em *{dep_nome}*.\nEscolha a categoria:",
+        parse_mode="Markdown",
+        reply_markup=kb_opcoes(opts, False)
+    )
+
 
 @dp.message(ShopState.navegando)
 async def navegar(message: types.Message, state: FSMContext):
+    dep_id, _, _, _ = await get_dep_data(state)
     data = await state.get_data()
     caminho = data.get("caminho", [])
 
     if message.text == "⬅️ Voltar":
         if not caminho:
             await state.clear()
-            return await message.answer("Menu Principal:", reply_markup=kb_menu())
+            await state.set_state(MainState.menu_principal)
+            return await message.answer("Menu principal:", reply_markup=kb_menu_principal())
+
         caminho.pop()
         await state.update_data(caminho=caminho)
         opts = list(catalogo.CATALOGO.keys()) if not caminho else catalogo.obter_opcoes(caminho)
@@ -89,19 +199,28 @@ async def navegar(message: types.Message, state: FSMContext):
 
     if message.text == "❌ Cancelar":
         await state.clear()
-        return await message.answer("Operação cancelada.", reply_markup=kb_menu())
+        await state.set_state(MainState.menu_principal)
+        return await message.answer("Operação cancelada.", reply_markup=kb_menu_principal())
 
-    escolha = message.text.lower().replace(" ", "_")
-    nova_lista = catalogo.obter_opcoes(caminho + [escolha])
+    tipo, chave = catalogo.identificar_escolha(caminho, message.text)
 
-    if not nova_lista:
-        await state.update_data(produto=message.text)
-        await state.set_state(ShopState.quantidade)
-        await message.answer(f"Quanto de {message.text}?", reply_markup=types.ReplyKeyboardRemove())
-    else:
-        caminho.append(escolha)
+    if tipo == "categoria":
+        caminho.append(chave)
         await state.update_data(caminho=caminho)
-        await message.answer("Selecione:", reply_markup=kb_opcoes(nova_lista))
+        nova_lista = catalogo.obter_opcoes(caminho)
+        if not nova_lista:
+            await state.clear()
+            await state.set_state(MainState.menu_principal)
+            return await message.answer("Categoria vazia.", reply_markup=kb_menu_principal())
+        return await message.answer("Selecione:", reply_markup=kb_opcoes(nova_lista))
+
+    if tipo == "produto":
+        await state.update_data(produto=chave)
+        await state.set_state(ShopState.quantidade)
+        return await message.answer(f"Quanto de {chave}?", reply_markup=ReplyKeyboardRemove())
+
+    await message.answer("Opção inválida. Use o teclado do bot.")
+
 
 @dp.message(ShopState.quantidade)
 async def set_qtd(message: types.Message, state: FSMContext):
@@ -110,84 +229,117 @@ async def set_qtd(message: types.Message, state: FSMContext):
         await state.update_data(qtd=qtd)
         await state.set_state(ShopState.valor)
         await message.answer("Qual o valor unitário? (Ex: 5.50)")
-    except:
-        await message.answer("Por favor, digite um número.")
+    except ValueError:
+        await message.answer("Por favor, digite um número válido.")
+
 
 @dp.message(ShopState.valor)
 async def set_valor(message: types.Message, state: FSMContext):
+    dep_id, _, _, _ = await get_dep_data(state)
+
     try:
         valor = float(message.text.replace(",", "."))
         data = await state.get_data()
-        await database.adicionar_ao_carrinho(message.from_user.id, data['produto'], data['qtd'], valor)
+        await database.adicionar_ao_carrinho(
+            message.from_user.id,
+            dep_id,
+            data["produto"],
+            data["qtd"],
+            valor
+        )
         await state.set_state(ShopState.navegando)
 
-        # Exibe extrato atualizado
-        await extrato_carrinho(message)
+        await extrato_carrinho(message, dep_id)
 
-        # Volta para o nível atual do catálogo
         caminho = data.get("caminho", [])
         opts = catalogo.obter_opcoes(caminho) if caminho else list(catalogo.CATALOGO.keys())
         await message.answer("Adicione mais itens ou cancele:", reply_markup=kb_opcoes(opts, len(caminho) > 0))
-    except:
+    except ValueError:
         await message.answer("Valor inválido.")
+
+
+@dp.message(F.text == "📦 Ver Carrinho")
+async def ver_carrinho(message: types.Message, state: FSMContext):
+    dep_id, _, _, _ = await get_dep_data(state)
+    if not dep_id:
+        return await message.answer("Envie /start e escolha um departamento primeiro.")
+
+    itens = await database.pegar_carrinho(message.from_user.id, dep_id)
+    if not itens:
+        return await message.answer("Carrinho vazio!")
+
+    texto = "🛒 *Carrinho Atual:*\n\n"
+    total = 0
+    for item in itens:
+        sub = item["quantidade"] * item["valor_unitario"]
+        total += sub
+        texto += f"• {item['item_nome']}: {item['quantidade']}x R${item['valor_unitario']:.2f} = R${sub:.2f}\n"
+    texto += f"\n💰 *TOTAL: R${total:.2f}*"
+    await message.answer(texto, parse_mode="Markdown")
+
 
 @dp.message(F.text == "🏁 Finalizar")
 async def finalizar(message: types.Message, state: FSMContext):
-    itens = await database.pegar_carrinho()
+    dep_id, dep_nome, _, _ = await get_dep_data(state)
+    if not dep_id:
+        return await message.answer("Envie /start e escolha um departamento primeiro.")
+
+    itens = await database.pegar_carrinho(message.from_user.id, dep_id)
     if not itens:
-        return await message.answer("🛒 Carrinho vazio! Adicione itens antes de finalizar.", reply_markup=kb_nova_compra())
+        await state.clear()
+        return await message.answer(
+            "👋 Até logo!\nSe quiser começar de novo, envie /start.",
+            reply_markup=ReplyKeyboardRemove()
+        )
 
     texto = "🛒 *Resumo do carrinho:*\n\n"
     total = 0
     itens_detalhe = []
+
     for item in itens:
-        sub = item['quantidade'] * item['valor_unitario']
+        sub = item["quantidade"] * item["valor_unitario"]
         total += sub
         texto += f"• {item['item_nome']}: {item['quantidade']}x R${item['valor_unitario']:.2f} = R${sub:.2f}\n"
-        itens_detalhe.append({"nome": item['item_nome'], "quantidade": item['quantidade'], "valor_unitario": item['valor_unitario']})
+        itens_detalhe.append({
+            "nome": item["item_nome"],
+            "quantidade": item["quantidade"],
+            "valor_unitario": item["valor_unitario"]
+        })
+
     texto += f"\n💰 *Total: R${total:.2f}*\n\n🏪 Qual o nome do mercado?"
-
-    await state.set_state(ShopState.finalizando_mercado)
+    await state.set_state(MainState.finalizando_mercado)
     await state.update_data(itens_detalhe=itens_detalhe, total=total)
-    await message.answer(texto, parse_mode="Markdown", reply_markup=types.ReplyKeyboardRemove())
+    await message.answer(texto, parse_mode="Markdown", reply_markup=ReplyKeyboardRemove())
 
-@dp.message(ShopState.finalizando_mercado)
+
+@dp.message(MainState.finalizando_mercado)
 async def finalizar_mercado(message: types.Message, state: FSMContext):
+    dep_id, _, _, _ = await get_dep_data(state)
     mercado = message.text.strip()
     data = await state.get_data()
     itens_detalhe = data.get("itens_detalhe", [])
     total = data.get("total", 0)
 
-    await database.salvar_historico("Compra Avulsa", mercado, itens_detalhe, total)
-    await database.limpar_carrinho(message.from_user.id)
+    await database.salvar_historico(dep_id, "Compra Avulsa", mercado, itens_detalhe, total)
+    await database.limpar_carrinho(message.from_user.id, dep_id)
     await state.clear()
 
     await message.answer(
-        f"✅ *Compra no {mercado} finalizada!*\n"
+        f"✅ Compra no *{mercado}* finalizada!\n"
         f"💰 Total: R${total:.2f}\n"
         f"📦 {len(itens_detalhe)} itens registrados no histórico.\n\n"
-        f"Quando quiser, inicie uma nova compra! 👇",
+        f"Envie /start para escolher um departamento novamente.",
         parse_mode="Markdown",
-        reply_markup=kb_nova_compra()
+        reply_markup=ReplyKeyboardRemove()
     )
 
-@dp.message(F.text == "📦 Ver Carrinho")
-async def ver_carrinho(message: types.Message):
-    itens = await database.pegar_carrinho()
-    if not itens:
-        return await message.answer("Carrinho vazio!")
-    texto = "🛒 *Carrinho Atual:*\n\n"
-    total_geral = 0
-    for item in itens:
-        sub = item['quantidade'] * item['valor_unitario']
-        total_geral += sub
-        texto += f"• {item['item_nome']}: {item['quantidade']}x R${item['valor_unitario']:.2f} = R${sub:.2f}\n"
-    texto += f"\n💰 *TOTAL: R${total_geral:.2f}*"
-    await message.answer(texto, parse_mode="Markdown")
 
 async def main():
     dp.include_router(listas.router)
+    dp.include_router(categorias.router)
+    dp.include_router(produtos.router)
     await dp.start_polling(bot)
+
 
 if __name__ == "__main__":
     asyncio.run(main())
