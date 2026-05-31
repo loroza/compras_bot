@@ -144,9 +144,14 @@ async def lista_escolhida(message: types.Message, state: FSMContext):
 
 # ─── INICIAR COMPRA ─────────────────────────────────────────────────────────
 
-@router.message(F.text == "📋 Minhas Listas")
-async def iniciar_compra_direto(message: types.Message, state: FSMContext):
-    return await iniciar_compra(message, state)
+@router.message(F.text == "🚀 Iniciar Compra")
+async def iniciar_compra(message: types.Message, state: FSMContext):
+    listas = await database.pegar_listas_disponiveis()
+    if not listas:
+        return await message.answer("Nenhuma lista criada ainda!", reply_markup=kb_listas_menu())
+    await state.set_state(ListaState.escolhendo_lista)
+    await state.update_data(modo="compra")
+    await message.answer("Qual lista você quer usar?", reply_markup=kb_lista_escolha(listas))
 
 @router.message(F.text == "🚀 Iniciar Compra")
 async def iniciar_compra(message: types.Message, state: FSMContext):
