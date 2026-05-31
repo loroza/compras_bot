@@ -81,6 +81,8 @@ async def limpar_estado_preservando_departamento(state: FSMContext):
         )
 
 
+# ─── MENU PRODUTOS ────────────────────────────────────────────────────────────
+
 @router.message(F.text == "📦 Produtos")
 async def menu_produtos(message: types.Message, state: FSMContext):
     dep_id = await get_dep_id(state)
@@ -89,6 +91,8 @@ async def menu_produtos(message: types.Message, state: FSMContext):
 
     await message.answer("📦 Menu de Produtos:", reply_markup=kb_produtos_menu())
 
+
+# ─── CRIAR PRODUTO ────────────────────────────────────────────────────────────
 
 @router.message(F.text == "➕ Novo Produto")
 async def novo_produto(message: types.Message, state: FSMContext):
@@ -109,22 +113,23 @@ async def produto_nome(message: types.Message, state: FSMContext):
     dep_id = await get_dep_id(state)
     if not dep_id:
         await state.clear()
-        return await message.answer("Envie /start e escolha um departamento primeiro.")
+        return await message.answer("Sessão expirada. Envie /start.")
 
     categorias = await database.listar_categorias(dep_id)
-
     await state.set_state(ProdutoState.escolhendo_categoria)
 
     if not categorias:
-        await state.update_data(cat_id=None)
         return await message.answer(
-            "Nenhuma categoria cadastrada. O produto será salvo sem categoria?\n"
-            "Digite SIM para confirmar ou CANCELAR."
+            f"Nenhuma categoria cadastrada ainda.\n\n"
+            f"Deseja salvar *{nome}* sem categoria?",
+            reply_markup=kb_categoria_escolha([]),
+            parse_mode="Markdown",
         )
 
     await message.answer(
-        "Escolha a categoria do produto:",
+        f"Selecione a categoria para *{nome}*:",
         reply_markup=kb_categoria_escolha(categorias),
+        parse_mode="Markdown",
     )
 
 
@@ -133,63 +138,50 @@ async def produto_categoria(message: types.Message, state: FSMContext):
     dep_id = await get_dep_id(state)
     if not dep_id:
         await state.clear()
-        return await message.answer("Envie /start e escolha um departamento primeiro.")
-
-    data = await state.get_data()
-    nome = data.get("produto_nome")
+        return await message.answer("Sessão expirada. Envie /start.")
 
     if message.text == "❌ Cancelar":
         await limpar_estado_preservando_departamento(state)
         return await message.answer("Cancelado.", reply_markup=kb_produtos_menu())
 
-    categorias = await database.listar_categorias(dep_id)
+    data = await state.get_data()
+    nome = data.get("produto_nome")
 
-    if not categorias:
-        if message.text.strip().lower() != "sim":
-            await limpar_estado_preservando_departamento(state)
-            return await message.answer("Cancelado.", reply_markup=kb_produtos_menu())
+    cat_id = None
 
-        ok = await database.criar_produto(dep_id, nome, None)
-        await limpar_estado_preservando_departamento(state)
-
-        if ok:
-            return await message.answer(
-                f"✅ Produto *{nome}* criado sem categoria.",
-                reply_markup=kb_produtos_menu(),
-                parse_mode="Markdown",
-            )
-
-        return await message.answer(
-            "⚠️ Já existe um produto com esse nome.",
-            reply_markup=kb_produtos_menu(),
-        )
-
-    if message.text == "🚫 Sem Categoria":
-        cat_id = None
-    else:
+    if message.text != "🚫 Sem Categoria":
+        categorias = await database.listar_categorias(dep_id)
         mapa = {f"{c['emoji']} {c['nome']}": c["id"] for c in categorias}
-        if message.text not in mapa:
+        mapa_simples = {c["nome"]: c["id"] for c in categorias}
+
+        if message.text in mapa:
+            cat_id = mapa[message.text]
+        elif message.text in mapa_simples:
+            cat_id = mapa_simples[message.text]
+        else:
             return await message.answer(
-                "Escolha uma categoria válida.",
+                "Categoria não encontrada. Use os botões do teclado.",
                 reply_markup=kb_categoria_escolha(categorias),
             )
-        cat_id = mapa[message.text]
 
     ok = await database.criar_produto(dep_id, nome, cat_id)
     await limpar_estado_preservando_departamento(state)
 
     if ok:
         await message.answer(
-            f"✅ Produto *{nome}* criado!",
+            f"✅ Produto *{nome}* cadastrado com sucesso!",
             reply_markup=kb_produtos_menu(),
             parse_mode="Markdown",
         )
     else:
         await message.answer(
-            "⚠️ Já existe um produto com esse nome.",
+            f"⚠️ Já existe um produto chamado *{nome}* neste catálogo.",
             reply_markup=kb_produtos_menu(),
+            parse_mode="Markdown",
         )
 
+
+# ─── EDITAR PRODUTO ───────────────────────────────────────────────────────────
 
 @router.message(F.text == "✏️ Editar Produto")
 async def editar_produto(message: types.Message, state: FSMContext):
@@ -212,7 +204,7 @@ async def selecionar_produto(message: types.Message, state: FSMContext):
     dep_id = await get_dep_id(state)
     if not dep_id:
         await state.clear()
-        return await message.answer("Envie /start e escolha um departamento primeiro.")
+        return await message.answer("Sessão expirada. Envie /start.")
 
     if message.text == "❌ Cancelar":
         await limpar_estado_preservando_departamento(state)
@@ -220,7 +212,6 @@ async def selecionar_produto(message: types.Message, state: FSMContext):
 
     produtos = await database.listar_produtos(dep_id)
     mapa = {}
-
     for p in produtos:
         texto = p["nome"]
         if p["categoria_nome"]:
@@ -229,7 +220,7 @@ async def selecionar_produto(message: types.Message, state: FSMContext):
 
     if message.text not in mapa:
         return await message.answer(
-            "Escolha um produto válido.",
+            "Produto não encontrado. Use os botões do teclado.",
             reply_markup=kb_produto_escolha(produtos),
         )
 
@@ -247,9 +238,8 @@ async def selecionar_produto(message: types.Message, state: FSMContext):
     )
 
     texto_cat = p["categoria_nome"] if p["categoria_nome"] else "Sem categoria"
-
     await message.answer(
-        f"Produto selecionado: *{p['nome']}*\nCategoria atual: *{texto_cat}*",
+        f"Produto: *{p['nome']}*\nCategoria atual: *{texto_cat}*\n\nO que deseja fazer?",
         reply_markup=kb,
         parse_mode="Markdown",
     )
@@ -276,15 +266,16 @@ async def menu_edicao_produto(message: types.Message, state: FSMContext):
         dep_id = await get_dep_id(state)
         if not dep_id:
             await state.clear()
-            return await message.answer("Envie /start e escolha um departamento primeiro.")
+            return await message.answer("Sessão expirada. Envie /start.")
 
         categorias = await database.listar_categorias(dep_id)
-
         await state.set_state(ProdutoState.editando_categoria)
 
         if not categorias:
             return await message.answer(
-                "Não existem categorias cadastradas. Digite SIM para deixar sem categoria ou CANCELAR."
+                "Nenhuma categoria cadastrada. Deseja deixar sem categoria?\n\n"
+                "Clique em '🚫 Sem Categoria' ou '❌ Cancelar'.",
+                reply_markup=kb_categoria_escolha([]),
             )
 
         return await message.answer(
@@ -295,8 +286,9 @@ async def menu_edicao_produto(message: types.Message, state: FSMContext):
     if message.text == "🗑️ Excluir":
         await state.set_state(ProdutoState.excluindo)
         return await message.answer(
-            f"Confirma excluir *{prod_nome}*? Digite SIM para confirmar.",
+            f"Confirma excluir *{prod_nome}*?\n\nDigite *SIM* para confirmar.",
             parse_mode="Markdown",
+            reply_markup=ReplyKeyboardRemove(),
         )
 
     await message.answer("Use o teclado do bot.")
@@ -323,46 +315,60 @@ async def produto_nova_categoria(message: types.Message, state: FSMContext):
     dep_id = await get_dep_id(state)
     if not dep_id:
         await state.clear()
-        return await message.answer("Envie /start e escolha um departamento primeiro.")
-
-    data = await state.get_data()
-    prod_id = data.get("prod_id")
+        return await message.answer("Sessão expirada. Envie /start.")
 
     if message.text == "❌ Cancelar":
         await limpar_estado_preservando_departamento(state)
         return await message.answer("Cancelado.", reply_markup=kb_produtos_menu())
 
-    categorias = await database.listar_categorias(dep_id)
+    data = await state.get_data()
+    prod_id = data.get("prod_id")
 
-    if not categorias:
-        if message.text.strip().lower() != "sim":
-            await limpar_estado_preservando_departamento(state)
-            return await message.answer("Cancelado.", reply_markup=kb_produtos_menu())
+    cat_id = None
 
-        await database.atualizar_produto(prod_id, cat_id=None)
-        await limpar_estado_preservando_departamento(state)
-        return await message.answer(
-            "✅ Produto atualizado sem categoria.",
-            reply_markup=kb_produtos_menu(),
-        )
-
-    if message.text == "🚫 Sem Categoria":
-        cat_id = None
-    else:
+    if message.text != "🚫 Sem Categoria":
+        categorias = await database.listar_categorias(dep_id)
         mapa = {f"{c['emoji']} {c['nome']}": c["id"] for c in categorias}
-        if message.text not in mapa:
+        mapa_simples = {c["nome"]: c["id"] for c in categorias}
+
+        if message.text in mapa:
+            cat_id = mapa[message.text]
+        elif message.text in mapa_simples:
+            cat_id = mapa_simples[message.text]
+        else:
             return await message.answer(
-                "Escolha uma categoria válida.",
+                "Categoria não encontrada. Use os botões do teclado.",
                 reply_markup=kb_categoria_escolha(categorias),
             )
-        cat_id = mapa[message.text]
 
     await database.atualizar_produto(prod_id, cat_id=cat_id)
     await limpar_estado_preservando_departamento(state)
 
     await message.answer(
-        "✅ Categoria do produto atualizada.",
+        "✅ Categoria do produto atualizada com sucesso!",
         reply_markup=kb_produtos_menu(),
+    )
+
+
+# ─── EXCLUIR PRODUTO ──────────────────────────────────────────────────────────
+
+@router.message(F.text == "🗑️ Excluir Produto")
+async def excluir_produto_menu(message: types.Message, state: FSMContext):
+    dep_id = await get_dep_id(state)
+    if not dep_id:
+        return await message.answer("Envie /start e escolha um departamento primeiro.")
+
+    await limpar_estado_preservando_departamento(state)
+
+    produtos = await database.listar_produtos(dep_id)
+    if not produtos:
+        return await message.answer("Nenhum produto cadastrado.", reply_markup=kb_produtos_menu())
+
+    await state.set_state(ProdutoState.escolhendo_produto)
+    await state.update_data(modo="excluir")
+    await message.answer(
+        "Qual produto deseja excluir?",
+        reply_markup=kb_produto_escolha(produtos),
     )
 
 
@@ -380,7 +386,7 @@ async def produto_confirmar_exclusao(message: types.Message, state: FSMContext):
     await limpar_estado_preservando_departamento(state)
 
     await message.answer(
-        f"🗑️ Produto *{prod_nome}* excluído.",
+        f"🗑️ Produto *{prod_nome}* excluído com sucesso.",
         reply_markup=kb_produtos_menu(),
         parse_mode="Markdown",
     )
