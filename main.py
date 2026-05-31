@@ -694,6 +694,11 @@ async def historico_detalhe_nav(message: types.Message, state: FSMContext):
         return await message.answer("Menu principal:", reply_markup=kb_menu_principal())
 
 
+
+@dp.message(F.text == "📋 Minhas Listas")
+async def abrir_minhas_listas_compra(message: types.Message, state: FSMContext):
+    from listas import iniciar_compra
+    return await iniciar_compra(message, state)
 async def main():
     dp.include_router(listas.router)
     dp.include_router(categorias.router)
