@@ -1,11 +1,11 @@
-# Salve este conteúdo como listas.py (versão corrigida para extrair nome de asyncpg.Record)
+# listas.py
 from aiogram import Router, types, F
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
 
-import database
 import catalogo
+import database
 
 router = Router()
 
@@ -22,63 +22,7 @@ class ListaState(StatesGroup):
     removendo_item = State()
     escolhendo_lista_remover = State()
 
-# helper: compatibilidade com nome usado no código
-def obter_opcoes_nivel(caminho):
-    return catalogo.obter_opcoes(caminho)
-
-# ---- HELPERS ----
-
-def _nome_from_row(row):
-    if isinstance(row, str):
-        return row
-
-    # dict-like (plain dict)
-    try:
-        if isinstance(row, dict) and "nome" in row:
-            return row["nome"]
-    except Exception:
-        pass
-
-    # mapping-like (e.g., asyncpg.Record supports __getitem__)
-    try:
-        try:
-            val = row["nome"]
-            return val
-        except Exception:
-            pass
-    except Exception:
-        pass
-
-    # has get method (mapping)
-    try:
-        get = getattr(row, "get", None)
-        if callable(get):
-            try:
-                val = row.get("nome")
-                if val is not None:
-                    return val
-            except Exception:
-                pass
-    except Exception:
-        pass
-
-    # attribute access
-    try:
-        return getattr(row, "nome")
-    except Exception:
-        pass
-
-    # fallback
-    try:
-        return str(row)
-    except Exception:
-        return "<​unknown>"
-
-def _to_names(list_rows):
-    if not list_rows:
-        return []
-    return [_nome_from_row(r) for r in list_rows]
-
+# helpers de teclado
 def kb_menu():
     return ReplyKeyboardMarkup(keyboard=[
         [KeyboardButton(text="🛒 Compra Avulsa"), KeyboardButton(text="📋 Minhas Listas")],
@@ -99,6 +43,49 @@ def kb_opcoes(lista, voltar=True):
     btns.append([KeyboardButton(text="❌ Cancelar")])
     return ReplyKeyboardMarkup(keyboard=btns, resize_keyboard=True)
 
+def _nome_from_row(row):
+    if isinstance(row, str):
+        return row
+
+    try:
+        if isinstance(row, dict) and "nome" in row:
+            return row["nome"]
+    except Exception:
+        pass
+
+    # mapping-like (asyncpg.Record supports __getitem__)
+    try:
+        val = row["nome"]
+        return val
+    except Exception:
+        pass
+
+    # has get method (mapping)
+    try:
+        get = getattr(row, "get", None)
+        if callable(get):
+            val = row.get("nome")
+            if val is not None:
+                return val
+    except Exception:
+        pass
+
+    # attribute access
+    try:
+        return getattr(row, "nome")
+    except Exception:
+        pass
+
+    try:
+        return str(row)
+    except Exception:
+        return "<​unknown>"
+
+def _to_names(list_rows):
+    if not list_rows:
+        return []
+    return [_nome_from_row(r) for r in list_rows]
+
 def kb_lista_escolha(listas):
     nomes = _to_names(listas)
     btns = [[KeyboardButton(text=nome)] for nome in nomes]
@@ -108,9 +95,7 @@ def kb_lista_escolha(listas):
     return ReplyKeyboardMarkup(keyboard=btns, resize_keyboard=True)
 
 # ---- WRAPPERS DB (tolerância a assinaturas) ----
-
 async def pegar_listas_tolerante(dep_id):
-    # tentar com dep_id, senão sem argumentos
     try:
         return await database.pegar_listas_disponiveis(dep_id)
     except TypeError:
@@ -126,16 +111,12 @@ async def criar_lista_tolerante(dep_id, nome):
         return await database.criar_lista(nome)
 
 async def pegar_itens_tolerante(dep_id, lista_identificador):
-    # tentar diferentes assinaturas
     try:
-        # (dep_id, nome/id)
         return await database.pegar_itens_da_lista(dep_id, lista_identificador)
     except TypeError:
         try:
-            # (nome/id)
             return await database.pegar_itens_da_lista(lista_identificador)
         except Exception:
-            # (id) caso o identificador seja id
             try:
                 return await database.pegar_itens_da_lista(int(lista_identificador))
             except Exception:
@@ -166,10 +147,9 @@ async def adicionar_ao_carrinho_tolerante(user_id, dep_id, item, qtd, valor):
         else:
             return await database.adicionar_ao_carrinho(user_id, item, qtd, valor)
     except TypeError:
-        # fallback sem dep_id
         return await database.adicionar_ao_carrinho(user_id, item, qtd, valor)
 
-# ---- FLUXOS ----
+# ---- HANDLERS ----
 
 @router.message(F.text == "📋 Minhas Listas")
 async def minhas_listas_handler(message: types.Message, state: FSMContext):
@@ -180,12 +160,10 @@ async def minhas_listas_handler(message: types.Message, state: FSMContext):
 
     listas = await pegar_listas_tolerante(dep_id)
     if not listas:
-        # sem listas: mostra menu para criar/gerenciar
         await state.clear()
         await state.set_data({"departamento_id": dep_id})
         return await message.answer("Nenhuma lista encontrada. O que deseja fazer?", reply_markup=kb_listas_menu())
 
-    # caso existam listas mostramos escolha e assumimos compra por seleção direta
     await state.set_state(ListaState.escolhendo_lista)
     await state.update_data(modo="compra")
     return await message.answer("Qual lista você quer usar?", reply_markup=kb_lista_escolha(listas))
@@ -198,8 +176,6 @@ async def voltar_menu(message: types.Message, state: FSMContext):
     if dep_id:
         await state.set_data({"departamento_id": dep_id})
     await message.answer("Menu Principal:", reply_markup=kb_menu())
-
-# ---- criar lista ----
 
 @router.message(F.text == "➕ Nova Lista")
 async def nova_lista(message: types.Message, state: FSMContext):
@@ -226,8 +202,6 @@ async def salvar_nome_lista(message: types.Message, state: FSMContext):
     else:
         await message.answer(f"⚠️ Já existe uma lista com o nome *{nome}* ou ocorreu erro.", reply_markup=kb_listas_menu(), parse_mode="Markdown")
 
-# ---- adicionar itens: inicia escolhendo lista com modo adicionar ----
-
 @router.message(F.text == "📝 Adicionar Itens")
 async def adicionar_itens_entry(message: types.Message, state: FSMContext):
     data = await state.get_data()
@@ -243,8 +217,6 @@ async def adicionar_itens_entry(message: types.Message, state: FSMContext):
     await state.update_data(modo="adicionar")
     await message.answer("Qual lista você quer editar?", reply_markup=kb_lista_escolha(listas))
 
-# ---- iniciar compra (botão dedicado) ----
-
 @router.message(F.text == "🚀 Iniciar Compra")
 async def iniciar_compra_entry(message: types.Message, state: FSMContext):
     data = await state.get_data()
@@ -259,8 +231,6 @@ async def iniciar_compra_entry(message: types.Message, state: FSMContext):
     await state.set_state(ListaState.escolhendo_lista)
     await state.update_data(modo="compra")
     await message.answer("Qual lista você quer usar?", reply_markup=kb_lista_escolha(listas))
-
-# ---- handler genérico: usuário escolheu uma lista (modo pode ser adicionar ou compra) ----
 
 @router.message(ListaState.escolhendo_lista)
 async def escolha_lista_handler(message: types.Message, state: FSMContext):
@@ -281,7 +251,6 @@ async def escolha_lista_handler(message: types.Message, state: FSMContext):
     if message.text not in nomes:
         return await message.answer("Lista não encontrada. Tente novamente.", reply_markup=kb_lista_escolha(listas))
 
-    # se modo indefinido assumimos compra (comportamento desejado)
     if modo not in ("adicionar", "compra"):
         modo = "compra"
 
@@ -295,10 +264,8 @@ async def escolha_lista_handler(message: types.Message, state: FSMContext):
             parse_mode="Markdown"
         )
 
-    # modo == compra
     itens = await pegar_itens_tolerante(dep_id, message.text)
 
-    # DEBUG: opcional, mostra quantos itens o DB retornou
     if DEBUG_SHOW_COUNT:
         await message.answer(f"DEBUG: banco retornou {len(itens)} itens para a lista '{message.text}'.")
 
@@ -306,7 +273,6 @@ async def escolha_lista_handler(message: types.Message, state: FSMContext):
         await state.clear()
         return await message.answer("Essa lista está vazia! Adicione itens primeiro.", reply_markup=kb_listas_menu())
 
-    # limpar carrinho e iniciar
     await limpar_carrinho_tolerante(message.from_user.id, dep_id)
     await state.set_state(ListaState.compra_navegando)
     await state.update_data(
@@ -328,8 +294,6 @@ async def escolha_lista_handler(message: types.Message, state: FSMContext):
         reply_markup=kb,
         parse_mode="Markdown"
     )
-
-# ---- compra: navegação, seleção, quantidade, valor ----
 
 @router.message(ListaState.compra_navegando)
 async def compra_navegar(message: types.Message, state: FSMContext):
@@ -454,8 +418,6 @@ async def compra_val(message: types.Message, state: FSMContext):
     )
     await _mostrar_nivel_compra(message, state, caminho, itens_lista, itens_comprados)
 
-# ---- navegar catálogo para adicionar itens ----
-
 @router.message(ListaState.navegando_catalogo)
 async def navegar_catalogo_lista(message: types.Message, state: FSMContext):
     data = await state.get_data()
@@ -494,8 +456,6 @@ async def navegar_catalogo_lista(message: types.Message, state: FSMContext):
         await message.answer(f"📂 {message.text}:", reply_markup=kb_opcoes(novas_opts))
     else:
         await message.answer("Opção inválida. Use o teclado do bot.")
-
-# ---- remover item ----
 
 @router.message(F.text == "🗑️ Remover Item")
 async def cmd_remover(message: types.Message, state: FSMContext):
@@ -554,7 +514,6 @@ async def confirmar_remocao(message: types.Message, state: FSMContext):
             await message.answer("Erro ao remover item no banco. Verifique logs.")
             return
 
-    # re-obter itens para atualizar UI
     itens = await pegar_itens_tolerante(dep_id, lista_atual)
     if not itens:
         await state.clear()
@@ -569,10 +528,6 @@ async def confirmar_remocao(message: types.Message, state: FSMContext):
             parse_mode="Markdown"
         )
 
-# Compatibilidade com main.py — main espera uma coroutine iniciar_compra(message, state)
+# Compatibilidade com main.py — exportar iniciar_compra se necessário
 async def iniciar_compra(message: types.Message, state: FSMContext):
-    """
-    Wrapper compatível para ser chamada por `main.py`.
-    Delegamos para o handler que já implementa o fluxo de iniciar compra.
-    """
     return await iniciar_compra_entry(message, state)
