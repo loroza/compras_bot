@@ -9,10 +9,8 @@ from aiogram.types import KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemo
 from dotenv import load_dotenv
 
 import catalogo
-import categorias
 import database
 import listas
-import produtos
 
 load_dotenv()
 
@@ -69,10 +67,10 @@ def kb_menu_compras():
 
 
 def kb_menu_cadastros():
+    # Ajustado: removi opções de Categorias/Produtos do chat.
     return ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text="🏷️ Categorias"), KeyboardButton(text="📋 Listas")],
-            [KeyboardButton(text="📦 Produtos")],
+            [KeyboardButton(text="📋 Listas")],
             [KeyboardButton(text="⬅️ Menu Principal")],
         ],
         resize_keyboard=True,
@@ -224,6 +222,7 @@ async def abrir_cadastros(message: types.Message, state: FSMContext):
     if not dep_id:
         return await message.answer("Envie /start e escolha um departamento primeiro.")
 
+    # Cadastros agora só expõe "Listas" no chat.
     await state.set_state(MainState.menu_principal)
     await message.answer("📲 Menu de Cadastros:", reply_markup=kb_menu_cadastros())
 
@@ -566,32 +565,6 @@ async def finalizar_do_carrinho(message: types.Message, state: FSMContext):
     await message.answer(texto, parse_mode="Markdown", reply_markup=ReplyKeyboardRemove())
 
 
-@dp.message(MainState.finalizando_mercado)
-async def finalizar_mercado(message: types.Message, state: FSMContext):
-    dep_id, _, _, _ = await get_dep_data(state)
-    if not dep_id:
-        await state.clear()
-        return await message.answer("Envie /start e escolha um departamento primeiro.")
-
-    mercado = message.text.strip()
-    data = await state.get_data()
-    itens_detalhe = data.get("itens_detalhe", [])
-    total = data.get("total", 0)
-
-    # Guarda mercado e pede confirmação
-    await state.update_data(mercado_pendente=mercado)
-    await state.set_state(MainState.carrinho_menu)
-    await state.update_data(acao_pendente="finalizar")
-
-    texto = (
-        f"🏪 Mercado: *{mercado}*\n"
-        f"💰 Total: *R${total:.2f}*\n"
-        f"📦 {len(itens_detalhe)} itens\n\n"
-        f"Confirmar finalização?"
-    )
-    await message.answer(texto, parse_mode="Markdown", reply_markup=kb_confirmar())
-
-
 # ─── HISTÓRICO ────
 
 @dp.message(F.text == "📜 Histórico")
@@ -671,38 +644,15 @@ async def selecionar_historico(message: types.Message, state: FSMContext):
     await message.answer(texto, parse_mode="Markdown", reply_markup=kb_voltar)
 
 
-@dp.message(MainState.historico_detalhe)
-async def historico_detalhe_nav(message: types.Message, state: FSMContext):
-    dep_id, dep_nome, _, _ = await get_dep_data(state)
-
-    if message.text == "⬅️ Voltar Histórico":
-        compras = await database.listar_historico(dep_id)
-        btns = []
-        for c in compras:
-            data_fmt = c["data"].strftime("%d/%m/%Y %H:%M") if c["data"] else "?"
-            label = f"🏪 {c['mercado']} — R${c['total']:.2f} ({data_fmt})"
-            btns.append([KeyboardButton(text=label)])
-        btns.append([KeyboardButton(text="⬅️ Menu Principal")])
-        kb = ReplyKeyboardMarkup(keyboard=btns, resize_keyboard=True)
-        await state.set_state(MainState.historico_menu)
-        await state.update_data(historico_compras=[dict(c) for c in compras])
-        return await message.answer("📜 Selecione uma compra:", reply_markup=kb)
-
-    if message.text == "⬅️ Menu Principal":
-        await limpar_estado_preservando_departamento(state)
-        await state.set_state(MainState.menu_principal)
-        return await message.answer("Menu principal:", reply_markup=kb_menu_principal())
-
-
-
 @dp.message(F.text == "📋 Minhas Listas")
 async def abrir_minhas_listas_compra(message: types.Message, state: FSMContext):
     from listas import iniciar_compra
     return await iniciar_compra(message, state)
+
+
 async def main():
     dp.include_router(listas.router)
-    dp.include_router(categorias.router)
-    dp.include_router(produtos.router)
+    # NOTA: categorias e produtos foram removidos do registro de routers
     await dp.start_polling(bot)
 
 
