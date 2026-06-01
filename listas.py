@@ -46,9 +46,10 @@ def kb_menu():
     ], resize_keyboard=True)
 
 def kb_listas_menu():
+    # Ajustado: removido "🚀 Iniciar Compra" — iniciar compra só via Compras > Minhas Listas
     return ReplyKeyboardMarkup(keyboard=[
         [KeyboardButton(text="➕ Nova Lista")],
-        [KeyboardButton(text="📝 Adicionar Itens"), KeyboardButton(text="🚀 Iniciar Compra")],
+        [KeyboardButton(text="📝 Adicionar Itens")],
         [KeyboardButton(text="🗑️ Remover Item"), KeyboardButton(text="⬅️ Menu Principal")]
     ], resize_keyboard=True)
 
@@ -72,10 +73,13 @@ def obter_opcoes_nivel(caminho):
     return catalogo.obter_opcoes(caminho)
 
 
-# ─── MENU LISTAS ────────────────────────────────────────────────────────────
+# ─── MENU LISTAS ────
 
 @router.message(F.text == "📋 Listas")
-async def menu_listas(message: types.Message):
+async def menu_listas(message: types.Message, state: FSMContext):
+    # limpar estado anterior para evitar modos residuais (ex: "adicionar") que
+    # causem seleção de lista a iniciar outro fluxo indevido
+    await state.clear()
     await message.answer("📋 Gerenciador de Listas:", reply_markup=kb_listas_menu())
 
 @router.message(F.text == "⬅️ Menu Principal")
@@ -84,7 +88,7 @@ async def voltar_menu(message: types.Message, state: FSMContext):
     await message.answer("Menu Principal:", reply_markup=kb_menu())
 
 
-# ─── CRIAR LISTA ────────────────────────────────────────────────────────────
+# ─── CRIAR LISTA ────
 
 @router.message(F.text == "➕ Nova Lista")
 async def nova_lista(message: types.Message, state: FSMContext):
@@ -107,7 +111,7 @@ async def salvar_nome_lista(message: types.Message, state: FSMContext):
         await message.answer(f"⚠️ Já existe uma lista com o nome *{nome}*.", reply_markup=kb_listas_menu(), parse_mode="Markdown")
 
 
-# ─── ADICIONAR ITENS À LISTA ────────────────────────────────────────────────
+# ─── ADICIONAR ITENS À LISTA ────
 
 @router.message(F.text == "📝 Adicionar Itens")
 async def adicionar_itens(message: types.Message, state: FSMContext):
@@ -162,6 +166,7 @@ async def lista_escolhida(message: types.Message, state: FSMContext):
             await state.clear()
             return await message.answer("Essa lista está vazia! Adicione itens primeiro.", reply_markup=kb_listas_menu())
 
+        # limpa carrinho atual e inicia o fluxo de compra baseado na lista
         await database.limpar_carrinho(message.from_user.id, dep_id)
         await state.set_state(ListaState.compra_navegando)
         await state.update_data(
@@ -184,11 +189,17 @@ async def lista_escolhida(message: types.Message, state: FSMContext):
             parse_mode="Markdown"
         )
 
+    else:
+        # Se não houver modo definido, orientar o usuário (caso raro)
+        await state.clear()
+        return await message.answer("Escolha uma ação primeiro: 📝 Adicionar Itens (em Cadastros) ou use Compras > 📋 Minhas Listas para iniciar uma compra.", reply_markup=kb_listas_menu())
 
-# ─── INICIAR COMPRA ─────────────────────────────────────────────────────────
+
+# ─── INICIAR COMPRA (via Compras > 📋 Minhas Listas) ────
 
 @router.message(F.text == "🚀 Iniciar Compra")
 async def iniciar_compra(message: types.Message, state: FSMContext):
+    # Nota: este handler ainda responde ao botão (caso alguém o tenha)
     data = await state.get_data()
     dep_id = data.get("departamento_id")
     if not dep_id:
@@ -197,12 +208,24 @@ async def iniciar_compra(message: types.Message, state: FSMContext):
     nomes = [_nome_from_row(l) for l in listas] if listas else []
     if not nomes:
         return await message.answer("Nenhuma lista criada ainda!", reply_markup=kb_listas_menu())
+
+    # zera possíveis dados residuais e seta modo de compra explicitamente
+    await state.update_data(
+        modo="compra",
+        lista_atual=None,
+        itens_lista=None,
+        itens_comprados=None,
+        caminho_compra=None,
+    )
     await state.set_state(ListaState.escolhendo_lista)
-    await state.update_data(modo="compra")
     await message.answer("Qual lista você quer usar?", reply_markup=kb_lista_escolha(nomes))
 
 
-# ─── NAVEGAÇÃO DURANTE A COMPRA ─────────────────────────────────────────────
+# Observação: o fluxo Compras > "📋 Minhas Listas" no main.py chama diretamente a função iniciar_compra(...)
+# portanto o botão "📋 Minhas Listas" no menu de Compras iniciará este fluxo e apresentará as listas para seleção.
+
+
+# ─── NAVEGAÇÃO DURANTE A COMPRA ────
 
 @router.message(ListaState.compra_navegando)
 async def compra_navegar(message: types.Message, state: FSMContext):
@@ -290,7 +313,7 @@ async def _mostrar_nivel_compra(message, state, caminho, itens_lista, itens_comp
         await message.answer("Selecione:", reply_markup=kb)
 
 
-# ─── QUANTIDADE E VALOR DURANTE COMPRA ──────────────────────────────────────
+# ─── QUANTIDADE E VALOR DURANTE COMPRA ────
 
 @router.message(ListaState.compra_quantidade)
 async def compra_qtd(message: types.Message, state: FSMContext):
@@ -332,7 +355,7 @@ async def compra_val(message: types.Message, state: FSMContext):
     await _mostrar_nivel_compra(message, state, caminho, itens_lista, itens_comprados)
 
 
-# ─── NAVEGAÇÃO NO CATÁLOGO PARA ADICIONAR ITEM À LISTA ──────────────────────
+# ─── NAVEGAÇÃO NO CATÁLOGO PARA ADICIONAR ITEM À LISTA ────
 
 @router.message(ListaState.navegando_catalogo)
 async def navegar_catalogo_lista(message: types.Message, state: FSMContext):
@@ -373,7 +396,7 @@ async def navegar_catalogo_lista(message: types.Message, state: FSMContext):
         await message.answer("Opção inválida. Use o teclado do bot.")
 
 
-# ─── REMOVER ITEM DA LISTA ───────────────────────────────────────────────────
+# ─── REMOVER ITEM DA LISTA ────
 
 @router.message(F.text == "🗑️ Remover Item")
 async def cmd_remover(message: types.Message, state: FSMContext):
