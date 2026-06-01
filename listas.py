@@ -1,4 +1,4 @@
-# Salve este conteúdo como listas.py (versão corrigida)
+# Salve este conteúdo como listas.py (versão corrigida para extrair nome de asyncpg.Record)
 from aiogram import Router, types, F
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
@@ -31,17 +31,48 @@ def obter_opcoes_nivel(caminho):
 def _nome_from_row(row):
     if isinstance(row, str):
         return row
+
+    # dict-like (plain dict)
     try:
         if isinstance(row, dict) and "nome" in row:
             return row["nome"]
     except Exception:
         pass
+
+    # mapping-like (e.g., asyncpg.Record supports __getitem__)
+    try:
+        try:
+            val = row["nome"]
+            return val
+        except Exception:
+            pass
+    except Exception:
+        pass
+
+    # has get method (mapping)
+    try:
+        get = getattr(row, "get", None)
+        if callable(get):
+            try:
+                val = row.get("nome")
+                if val is not None:
+                    return val
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+    # attribute access
     try:
         return getattr(row, "nome")
     except Exception:
         pass
+
     # fallback
-    return str(row)
+    try:
+        return str(row)
+    except Exception:
+        return "<​unknown>"
 
 def _to_names(list_rows):
     if not list_rows:
