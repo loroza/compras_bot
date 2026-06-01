@@ -8,6 +8,9 @@ import catalogo
 
 router = Router()
 
+# DEBUG: marque True para mostrar quantos itens o DB retornou ao iniciar compra
+DEBUG_SHOW_COUNT = True
+
 class ListaState(StatesGroup):
     criando_nome = State()
     escolhendo_lista = State()
@@ -18,23 +21,27 @@ class ListaState(StatesGroup):
     removendo_item = State()
     escolhendo_lista_remover = State()
 
+# ---------- HELPERS ----------
+
 def _nome_from_row(row):
-    """Retorna o nome a partir de uma string, dict/Record ou atributo."""
     if isinstance(row, str):
         return row
     try:
-        nome = row.get("nome")
-        if nome:
-            return nome
+        if isinstance(row, dict) and "nome" in row:
+            return row["nome"]
     except Exception:
         pass
     try:
-        nome = getattr(row, "nome")
-        if nome:
-            return nome
+        return getattr(row, "nome")
     except Exception:
         pass
+    # fallback
     return str(row)
+
+def _to_names(list_rows):
+    if not list_rows:
+        return []
+    return [_nome_from_row(r) for r in list_rows]
 
 def kb_menu():
     return ReplyKeyboardMarkup(keyboard=[
@@ -57,63 +64,95 @@ def kb_opcoes(lista, voltar=True):
     return ReplyKeyboardMarkup(keyboard=btns, resize_keyboard=True)
 
 def kb_lista_escolha(listas):
-    nomes = [_nome_from_row(l) for l in listas] if listas else []
+    nomes = _to_names(listas)
     btns = [[KeyboardButton(text=nome)] for nome in nomes]
+    if not btns:
+        btns = [[KeyboardButton(text="➕ Nova Lista")]]
     btns.append([KeyboardButton(text="❌ Cancelar")])
     return ReplyKeyboardMarkup(keyboard=btns, resize_keyboard=True)
 
-def obter_opcoes_nivel(caminho):
-    if not caminho:
-        return list(catalogo.CATALOGO.keys())
-    return catalogo.obter_opcoes(caminho)
+# ---------- WRAPPERS DB (tolerância a assinaturas) ----------
 
-
-# helpers tolerantes às diferentes assinaturas do database.py
-
-async def _pegar_listas_para_dep(dep_id):
-    """Chama database.pegar_listas_disponiveis com dep_id (esperado)."""
-    return await database.pegar_listas_disponiveis(dep_id)
-
-async def _buscar_lista_por_nome(dep_id, nome):
-    """Tenta várias assinaturas para buscar a lista (compatibilidade)."""
+async def pegar_listas_tolerante(dep_id):
+    # tentar com dep_id, senão sem argumentos
     try:
-        # versão que aceita (dep_id, nome)
-        return await database.buscar_lista_por_nome(dep_id, nome)
+        return await database.pegar_listas_disponiveis(dep_id)
     except TypeError:
         try:
-            # versão que aceita só nome
-            return await database.buscar_lista_por_nome(nome)
+            return await database.pegar_listas_disponiveis()
         except Exception:
-            return None
+            return []
 
-async def _pegar_itens_da_lista_variavel(arg):
-    """Tenta pegar itens por id ou por nome, aceitando várias assinaturas."""
-    # Tentar passar id primeiro (se for int)
+async def criar_lista_tolerante(dep_id, nome):
     try:
-        return await database.pegar_itens_da_lista(arg)
+        return await database.criar_lista(dep_id, nome)
     except TypeError:
-        # talvez assinatura seja (dep_id, nome) ou (nome,)
+        return await database.criar_lista(nome)
+
+async def pegar_itens_tolerante(dep_id, lista_identificador):
+    # tentar diferentes assinaturas
+    try:
+        # (dep_id, nome/id)
+        return await database.pegar_itens_da_lista(dep_id, lista_identificador)
+    except TypeError:
         try:
-            return await database.pegar_itens_da_lista(arg[0], arg[1])
+            # (nome/id)
+            return await database.pegar_itens_da_lista(lista_identificador)
         except Exception:
+            # (id) caso o identificador seja id
             try:
-                # fallback: se passou uma tupla (dep_id, nome) ou só nome
-                return await database.pegar_itens_da_lista(arg)
+                return await database.pegar_itens_da_lista(int(lista_identificador))
             except Exception:
                 return []
 
+async def adicionar_item_lista_tolerante(dep_id, lista_identificador, item):
+    try:
+        return await database.adicionar_item_lista(dep_id, lista_identificador, item)
+    except TypeError:
+        try:
+            return await database.adicionar_item_lista(lista_identificador, item)
+        except Exception:
+            raise
 
-# ─── MENU LISTAS ────
+async def limpar_carrinho_tolerante(user_id, dep_id=None):
+    try:
+        if dep_id is not None:
+            return await database.limpar_carrinho(user_id, dep_id)
+        else:
+            return await database.limpar_carrinho(user_id)
+    except TypeError:
+        return await database.limpar_carrinho(user_id)
+
+async def adicionar_ao_carrinho_tolerante(user_id, dep_id, item, qtd, valor):
+    try:
+        if dep_id is not None:
+            return await database.adicionar_ao_carrinho(user_id, dep_id, item, qtd, valor)
+        else:
+            return await database.adicionar_ao_carrinho(user_id, item, qtd, valor)
+    except TypeError:
+        # fallback sem dep_id
+        return await database.adicionar_ao_carrinho(user_id, item, qtd, valor)
+
+# ---------- FLUXOS ----------
 
 @router.message(F.text == "📋 Minhas Listas")
-async def menu_listas(message: types.Message, state: FSMContext):
-    # preservar departamento antes de limpar o estado
+async def minhas_listas_handler(message: types.Message, state: FSMContext):
     data = await state.get_data()
     dep_id = data.get("departamento_id")
-    await state.clear()
-    if dep_id:
+    if not dep_id:
+        return await message.answer("Envie /start e escolha um departamento primeiro.", reply_markup=kb_menu())
+
+    listas = await pegar_listas_tolerante(dep_id)
+    if not listas:
+        # sem listas: mostra menu para criar/gerenciar
+        await state.clear()
         await state.set_data({"departamento_id": dep_id})
-    await message.answer("📋 Gerenciador de Listas:", reply_markup=kb_listas_menu())
+        return await message.answer("Nenhuma lista encontrada. O que deseja fazer?", reply_markup=kb_listas_menu())
+
+    # caso existam listas mostramos escolha e assumimos compra por seleção direta
+    await state.set_state(ListaState.escolhendo_lista)
+    await state.update_data(modo="compra")
+    return await message.answer("Qual lista você quer usar?", reply_markup=kb_lista_escolha(listas))
 
 @router.message(F.text == "⬅️ Menu Principal")
 async def voltar_menu(message: types.Message, state: FSMContext):
@@ -124,8 +163,7 @@ async def voltar_menu(message: types.Message, state: FSMContext):
         await state.set_data({"departamento_id": dep_id})
     await message.answer("Menu Principal:", reply_markup=kb_menu())
 
-
-# ─── CRIAR LISTA ────
+# ---- criar lista ----
 
 @router.message(F.text == "➕ Nova Lista")
 async def nova_lista(message: types.Message, state: FSMContext):
@@ -140,36 +178,56 @@ async def salvar_nome_lista(message: types.Message, state: FSMContext):
     if not dep_id:
         await state.clear()
         return await message.answer("Envie /start e escolha um departamento primeiro.", reply_markup=kb_menu())
-    # tentar criar com assinatura que aceite dep_id
+
     try:
-        criado = await database.criar_lista(dep_id, nome)
-    except TypeError:
-        criado = await database.criar_lista(nome)
+        criado = await criar_lista_tolerante(dep_id, nome)
+    except Exception:
+        criado = False
+
     await state.clear()
     if criado:
         await message.answer(f"✅ Lista *{nome}* criada com sucesso!", reply_markup=kb_listas_menu(), parse_mode="Markdown")
     else:
-        await message.answer(f"⚠️ Já existe uma lista com o nome *{nome}*.", reply_markup=kb_listas_menu(), parse_mode="Markdown")
+        await message.answer(f"⚠️ Já existe uma lista com o nome *{nome}* ou ocorreu erro.", reply_markup=kb_listas_menu(), parse_mode="Markdown")
 
-
-# ─── ADICIONAR ITENS À LISTA ────
+# ---- adicionar itens: inicia escolhendo lista com modo adicionar ----
 
 @router.message(F.text == "📝 Adicionar Itens")
-async def adicionar_itens(message: types.Message, state: FSMContext):
+async def adicionar_itens_entry(message: types.Message, state: FSMContext):
     data = await state.get_data()
     dep_id = data.get("departamento_id")
     if not dep_id:
         return await message.answer("Envie /start e escolha um departamento primeiro.", reply_markup=kb_menu())
 
-    listas = await _pegar_listas_para_dep(dep_id)
+    listas = await pegar_listas_tolerante(dep_id)
     if not listas:
         return await message.answer("Nenhuma lista criada ainda. Crie uma primeiro!", reply_markup=kb_listas_menu())
+
     await state.set_state(ListaState.escolhendo_lista)
     await state.update_data(modo="adicionar")
     await message.answer("Qual lista você quer editar?", reply_markup=kb_lista_escolha(listas))
 
+# ---- iniciar compra (botão dedicado) ----
+
+@router.message(F.text == "🚀 Iniciar Compra")
+async def iniciar_compra_entry(message: types.Message, state: FSMContext):
+    data = await state.get_data()
+    dep_id = data.get("departamento_id")
+    if not dep_id:
+        return await message.answer("Envie /start e escolha um departamento primeiro.", reply_markup=kb_menu())
+
+    listas = await pegar_listas_tolerante(dep_id)
+    if not listas:
+        return await message.answer("Nenhuma lista criada ainda!", reply_markup=kb_listas_menu())
+
+    await state.set_state(ListaState.escolhendo_lista)
+    await state.update_data(modo="compra")
+    await message.answer("Qual lista você quer usar?", reply_markup=kb_lista_escolha(listas))
+
+# ---- handler genérico: usuário escolheu uma lista (modo pode ser adicionar ou compra) ----
+
 @router.message(ListaState.escolhendo_lista)
-async def lista_escolhida(message: types.Message, state: FSMContext):
+async def escolha_lista_handler(message: types.Message, state: FSMContext):
     if message.text == "❌ Cancelar":
         await state.clear()
         return await message.answer("Cancelado.", reply_markup=kb_listas_menu())
@@ -181,13 +239,13 @@ async def lista_escolhida(message: types.Message, state: FSMContext):
         await state.clear()
         return await message.answer("Envie /start e escolha um departamento primeiro.", reply_markup=kb_menu())
 
-    listas = await _pegar_listas_para_dep(dep_id)
-    nomes = [_nome_from_row(l) for l in listas] if listas else []
+    listas = await pegar_listas_tolerante(dep_id)
+    nomes = _to_names(listas)
 
     if message.text not in nomes:
-        return await message.answer("Lista não encontrada. Tente novamente.", reply_markup=kb_lista_escolha(nomes))
+        return await message.answer("Lista não encontrada. Tente novamente.", reply_markup=kb_lista_escolha(listas))
 
-    # se modo indefinido, assumir compra (fluxo desejado)
+    # se modo indefinido assumimos compra (comportamento desejado)
     if modo not in ("adicionar", "compra"):
         modo = "compra"
 
@@ -195,92 +253,47 @@ async def lista_escolhida(message: types.Message, state: FSMContext):
         await state.set_state(ListaState.navegando_catalogo)
         await state.update_data(lista_atual=message.text, caminho=[])
         opts = list(catalogo.CATALOGO.keys())
-        await message.answer(
+        return await message.answer(
             f"📝 Adicionando itens em *{message.text}*\nEscolha a categoria:",
             reply_markup=kb_opcoes(opts, False),
             parse_mode="Markdown"
         )
 
-    elif modo == "compra":
-        # tentar buscar lista e itens usando possíveis assinaturas do DB
-        lista_row = await _buscar_lista_por_nome(dep_id, message.text)
-        itens = []
-        if lista_row:
-            try:
-                lista_id = lista_row.get("id", lista_row[0]) if isinstance(lista_row, (dict,)) else lista_row[0]
-            except Exception:
-                lista_id = None
-            # tentar por id
-            if lista_id is not None:
-                try:
-                    itens = await database.pegar_itens_da_lista(lista_id)
-                except TypeError:
-                    # talvez pegar_itens_da_lista(nome) exista
-                    try:
-                        itens = await database.pegar_itens_da_lista(message.text)
-                    except Exception:
-                        itens = []
-        else:
-            # fallback: tentar pegar itens diretamente por nome
-            try:
-                itens = await database.pegar_itens_da_lista(message.text)
-            except TypeError:
-                # talvez assinatura seja (dep_id, nome)
-                try:
-                    itens = await database.pegar_itens_da_lista(dep_id, message.text)
-                except Exception:
-                    itens = []
+    # modo == compra
+    itens = await pegar_itens_tolerante(dep_id, message.text)
 
-        if not itens:
-            await state.clear()
-            return await message.answer("Essa lista está vazia! Adicione itens primeiro.", reply_markup=kb_listas_menu())
+    # DEBUG: opcional, mostra quantos itens o DB retornou
+    if DEBUG_SHOW_COUNT:
+        await message.answer(f"DEBUG: banco retornou {len(itens)} itens para a lista '{message.text}'.")
 
-        # limpa carrinho atual e inicia o fluxo de compra baseado na lista
-        try:
-            await database.limpar_carrinho(message.from_user.id, dep_id)
-        except TypeError:
-            await database.limpar_carrinho(message.from_user.id)
+    if not itens:
+        await state.clear()
+        return await message.answer("Essa lista está vazia! Adicione itens primeiro.", reply_markup=kb_listas_menu())
 
-        await state.set_state(ListaState.compra_navegando)
-        await state.update_data(
-            lista_atual=message.text,
-            itens_lista=itens,
-            itens_comprados=[],
-            caminho_compra=[]
-        )
+    # limpar carrinho e iniciar
+    await limpar_carrinho_tolerante(message.from_user.id, dep_id)
+    await state.set_state(ListaState.compra_navegando)
+    await state.update_data(
+        lista_atual=message.text,
+        itens_lista=itens,
+        itens_comprados=[],
+        caminho_compra=[]
+    )
 
-        categorias = catalogo.obter_opcoes([])
-        btns = [[KeyboardButton(text=catalogo.formatar(c))] for c in categorias]
-        btns.append([KeyboardButton(text="✅ Finalizar Compra")])
-        kb = ReplyKeyboardMarkup(keyboard=btns, resize_keyboard=True)
+    categorias = catalogo.obter_opcoes([])
+    btns = [[KeyboardButton(text=catalogo.formatar(c))] for c in categorias]
+    btns.append([KeyboardButton(text="✅ Finalizar Compra")])
+    kb = ReplyKeyboardMarkup(keyboard=btns, resize_keyboard=True)
 
-        await message.answer(
-            f"🛒 Compra da lista *{message.text}* iniciada!\n"
-            f"📋 {len(itens)} itens pendentes\n\n"
-            f"Navegue pelas categorias:",
-            reply_markup=kb,
-            parse_mode="Markdown"
-        )
+    await message.answer(
+        f"🛒 Compra da lista *{message.text}* iniciada!\n"
+        f"📋 {len(itens)} itens pendentes\n\n"
+        f"Navegue pelas categorias:",
+        reply_markup=kb,
+        parse_mode="Markdown"
+    )
 
-
-# ─── INICIAR COMPRA (via Compras > 📋 Minhas Listas) ────
-
-@router.message(F.text == "🚀 Iniciar Compra")
-async def iniciar_compra(message: types.Message, state: FSMContext):
-    data = await state.get_data()
-    dep_id = data.get("departamento_id")
-    if not dep_id:
-        return await message.answer("Envie /start e escolha um departamento primeiro.", reply_markup=kb_menu())
-
-    listas = await _pegar_listas_para_dep(dep_id)
-    if not listas:
-        return await message.answer("Nenhuma lista criada ainda!", reply_markup=kb_listas_menu())
-    await state.set_state(ListaState.escolhendo_lista)
-    await state.update_data(modo="compra")
-    await message.answer("Qual lista você quer usar?", reply_markup=kb_lista_escolha(listas))
-
-
-# ─── NAVEGAÇÃO DURANTE A COMPRA ────
+# ---- compra: navegação, seleção, quantidade, valor ----
 
 @router.message(ListaState.compra_navegando)
 async def compra_navegar(message: types.Message, state: FSMContext):
@@ -329,7 +342,6 @@ async def compra_navegar(message: types.Message, state: FSMContext):
     else:
         await message.answer("Opção inválida. Use o teclado do bot.")
 
-
 async def _mostrar_nivel_compra(message, state, caminho, itens_lista, itens_comprados):
     opcoes = catalogo.obter_opcoes(caminho)
     pendentes = [i for i in itens_lista if i not in itens_comprados]
@@ -367,9 +379,6 @@ async def _mostrar_nivel_compra(message, state, caminho, itens_lista, itens_comp
         kb = ReplyKeyboardMarkup(keyboard=btns, resize_keyboard=True)
         await message.answer("Selecione:", reply_markup=kb)
 
-
-# ─── QUANTIDADE E VALOR DURANTE COMPRA ────
-
 @router.message(ListaState.compra_quantidade)
 async def compra_qtd(message: types.Message, state: FSMContext):
     try:
@@ -393,14 +402,9 @@ async def compra_val(message: types.Message, state: FSMContext):
     caminho = data.get("caminho_compra", [])
     itens_lista = data.get("itens_lista", [])
     itens_comprados = data.get("itens_comprados", [])
-
     dep_id = data.get("departamento_id")
-    try:
-        await database.adicionar_ao_carrinho(message.from_user.id, dep_id, item, qtd, valor)
-    except TypeError:
-        # fallback sem dep_id
-        await database.adicionar_ao_carrinho(message.from_user.id, item, qtd, valor)
 
+    await adicionar_ao_carrinho_tolerante(message.from_user.id, dep_id, item, qtd, valor)
     itens_comprados.append(item)
     await state.update_data(itens_comprados=itens_comprados)
     await state.set_state(ListaState.compra_navegando)
@@ -414,26 +418,23 @@ async def compra_val(message: types.Message, state: FSMContext):
     )
     await _mostrar_nivel_compra(message, state, caminho, itens_lista, itens_comprados)
 
-
-# ─── NAVEGAÇÃO NO CATÁLOGO PARA ADICIONAR ITEM À LISTA ────
+# ---- navegar catálogo para adicionar itens ----
 
 @router.message(ListaState.navegando_catalogo)
 async def navegar_catalogo_lista(message: types.Message, state: FSMContext):
     data = await state.get_data()
     caminho = data.get("caminho", [])
     lista_atual = data.get("lista_atual")
+    dep_id = data.get("departamento_id")
 
     if message.text == "⬅️ Voltar":
         if not caminho:
             await state.set_state(ListaState.escolhendo_lista)
-            dep_id = data.get("departamento_id")
-            if not dep_id:
-                return await message.answer("Envie /start e escolha um departamento primeiro.", reply_markup=kb_menu())
-            listas = await _pegar_listas_para_dep(dep_id)
+            listas = await pegar_listas_tolerante(dep_id)
             return await message.answer("Escolha a lista:", reply_markup=kb_lista_escolha(listas))
         caminho.pop()
         await state.update_data(caminho=caminho)
-        opts = obter_opcoes_nivel(caminho)
+        opts = list(catalogo.CATALOGO.keys()) if not caminho else catalogo.obter_opcoes(caminho)
         return await message.answer("Voltando...", reply_markup=kb_opcoes(opts, len(caminho) > 0))
 
     if message.text == "❌ Cancelar":
@@ -443,18 +444,10 @@ async def navegar_catalogo_lista(message: types.Message, state: FSMContext):
     tipo, valor = catalogo.identificar_escolha(caminho, message.text)
 
     if tipo == "produto":
-        # adicionar_item_lista pode ter assinatura (dep_id, lista_id/nome, item) ou (lista_nome, item)
-        data = await state.get_data()
-        dep_id = data.get("departamento_id")
         try:
-            await database.adicionar_item_lista(dep_id, lista_atual, valor)
-        except TypeError:
-            try:
-                await database.adicionar_item_lista(lista_atual, valor)
-            except Exception:
-                # não falha explicitamente aqui, apenas informa
-                await message.answer("Erro ao adicionar item ao banco. Verifique logs.")
-                return
+            await adicionar_item_lista_tolerante(dep_id, lista_atual, valor)
+        except Exception:
+            return await message.answer("Erro ao adicionar item ao banco. Verifique logs.")
         opts = obter_opcoes_nivel(caminho)
         await message.answer(f"✅ *{valor}* adicionado!", reply_markup=kb_opcoes(opts, len(caminho) > 0), parse_mode="Markdown")
 
@@ -463,12 +456,10 @@ async def navegar_catalogo_lista(message: types.Message, state: FSMContext):
         await state.update_data(caminho=caminho)
         novas_opts = obter_opcoes_nivel(caminho)
         await message.answer(f"📂 {message.text}:", reply_markup=kb_opcoes(novas_opts))
-
     else:
         await message.answer("Opção inválida. Use o teclado do bot.")
 
-
-# ─── REMOVER ITEM DA LISTA ────
+# ---- remover item ----
 
 @router.message(F.text == "🗑️ Remover Item")
 async def cmd_remover(message: types.Message, state: FSMContext):
@@ -477,11 +468,11 @@ async def cmd_remover(message: types.Message, state: FSMContext):
     if not dep_id:
         return await message.answer("Envie /start e escolha um departamento primeiro.", reply_markup=kb_menu())
 
-    listas = await _pegar_listas_para_dep(dep_id)
+    listas = await pegar_listas_tolerante(dep_id)
     if not listas:
         return await message.answer("Nenhuma lista criada ainda!", reply_markup=kb_listas_menu())
     await state.set_state(ListaState.escolhendo_lista_remover)
-    await state.answer("De qual lista você quer remover um item?", reply_markup=kb_lista_escolha(listas))
+    await message.answer("De qual lista você quer remover um item?", reply_markup=kb_lista_escolha(listas))
 
 @router.message(ListaState.escolhendo_lista_remover)
 async def lista_para_remover(message: types.Message, state: FSMContext):
@@ -495,17 +486,7 @@ async def lista_para_remover(message: types.Message, state: FSMContext):
         await state.clear()
         return await message.answer("Envie /start e escolha um departamento primeiro.", reply_markup=kb_menu())
 
-    # obter itens (tentar por nome / por id)
-    itens = []
-    try:
-        # assinatura mais provável: pegar_itens_da_lista(dep_id, nome)
-        itens = await database.pegar_itens_da_lista(dep_id, message.text)
-    except TypeError:
-        try:
-            itens = await database.pegar_itens_da_lista(message.text)
-        except Exception:
-            itens = []
-
+    itens = await pegar_itens_tolerante(dep_id, message.text)
     if not itens:
         await state.clear()
         return await message.answer("Essa lista está vazia!", reply_markup=kb_listas_menu())
@@ -538,14 +519,7 @@ async def confirmar_remocao(message: types.Message, state: FSMContext):
             return
 
     # re-obter itens para atualizar UI
-    try:
-        itens = await database.pegar_itens_da_lista(dep_id, lista_atual)
-    except TypeError:
-        try:
-            itens = await database.pegar_itens_da_lista(lista_atual)
-        except Exception:
-            itens = []
-
+    itens = await pegar_itens_tolerante(dep_id, lista_atual)
     if not itens:
         await state.clear()
         await message.answer(f"🗑️ *{message.text}* removido!\n\nA lista ficou vazia.", reply_markup=kb_listas_menu(), parse_mode="Markdown")
