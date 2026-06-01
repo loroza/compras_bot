@@ -1,3 +1,4 @@
+# Salve este conteúdo como listas.py (versão corrigida)
 from aiogram import Router, types, F
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
@@ -21,7 +22,11 @@ class ListaState(StatesGroup):
     removendo_item = State()
     escolhendo_lista_remover = State()
 
-# ---------- HELPERS ----------
+# helper: compatibilidade com nome usado no código
+def obter_opcoes_nivel(caminho):
+    return catalogo.obter_opcoes(caminho)
+
+# ---- HELPERS ----
 
 def _nome_from_row(row):
     if isinstance(row, str):
@@ -71,7 +76,7 @@ def kb_lista_escolha(listas):
     btns.append([KeyboardButton(text="❌ Cancelar")])
     return ReplyKeyboardMarkup(keyboard=btns, resize_keyboard=True)
 
-# ---------- WRAPPERS DB (tolerância a assinaturas) ----------
+# ---- WRAPPERS DB (tolerância a assinaturas) ----
 
 async def pegar_listas_tolerante(dep_id):
     # tentar com dep_id, senão sem argumentos
@@ -133,7 +138,7 @@ async def adicionar_ao_carrinho_tolerante(user_id, dep_id, item, qtd, valor):
         # fallback sem dep_id
         return await database.adicionar_ao_carrinho(user_id, item, qtd, valor)
 
-# ---------- FLUXOS ----------
+# ---- FLUXOS ----
 
 @router.message(F.text == "📋 Minhas Listas")
 async def minhas_listas_handler(message: types.Message, state: FSMContext):
@@ -532,3 +537,11 @@ async def confirmar_remocao(message: types.Message, state: FSMContext):
             reply_markup=kb,
             parse_mode="Markdown"
         )
+
+# Compatibilidade com main.py — main espera uma coroutine iniciar_compra(message, state)
+async def iniciar_compra(message: types.Message, state: FSMContext):
+    """
+    Wrapper compatível para ser chamada por `main.py`.
+    Delegamos para o handler que já implementa o fluxo de iniciar compra.
+    """
+    return await iniciar_compra_entry(message, state)
