@@ -10,7 +10,8 @@ from dotenv import load_dotenv
 
 import catalogo
 import database
-import listas
+from listas import router as listas_router
+dp.include_router(listas_router)
 
 load_dotenv()
 
