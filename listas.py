@@ -98,7 +98,7 @@ def encontrar_item_raw_por_label(itens: list, label: str):
     return None
 
 
-# --- HELPERS PARA FILTRAR CATEGORIAS PELO CONTEÚDO DA LISTA ---
+# --- HELPERS PARA FILTRAR CATEGORIAS E SUBCATEGORIAS PELO CONTEÚDO DA LISTA ---
 def _buscar_produto_recursivo(no, produto):
     """
     Retorna True se 'produto' existir no nó 'no' (varre recursivamente).
@@ -135,15 +135,103 @@ def categorias_para_itens(itens):
     um produto presente em 'itens' (itens é uma lista de nomes).
     Se nenhuma categoria for encontrada, retorna todas as categorias como fallback.
     """
-    cats = set()
+    cats = []
+    seen = set()
     for prod in itens:
         for cat_key, cat_node in catalogo.CATALOGO.items():
             if _buscar_produto_recursivo(cat_node, prod):
-                cats.add(cat_key)
+                if cat_key not in seen:
+                    cats.append(cat_key)
+                    seen.add(cat_key)
                 break
     if not cats:
         return list(catalogo.CATALOGO.keys())
-    return sorted(cats)
+    return cats
+
+
+def _obter_no_por_caminho(caminho):
+    """
+    Retorna o nó do CATALOGO correspondente ao caminho (lista de chaves).
+    Se não encontrar, retorna None.
+    """
+    node = None
+    if not caminho:
+        # top-level: o "nó" é o catálogo inteiro (representado como dict de categorias)
+        return None
+    # Tentamos navegar: cada segmento pode residir em 'subcategorias', 'grupos' ou como chave direta
+    node = catalogo.CATALOGO
+    for seg in caminho:
+        if not isinstance(node, dict):
+            return None
+        found = None
+        # procurar em 'subcategorias' e 'grupos'
+        for container in ("subcategorias", "grupos"):
+            cont = node.get(container)
+            if isinstance(cont, dict) and seg in cont:
+                found = cont[seg]
+                break
+        # procurar como chave direta
+        if found is None and seg in node:
+            found = node[seg]
+        if found is None:
+            return None
+        node = found
+    return node
+
+
+def opcoes_filtradas_para_itens(caminho, itens):
+    """
+    Retorna a lista de opções (subcategorias, grupos e/ou produtos) presentes no nó
+    apontado por 'caminho' que contêm pelo menos um produto de 'itens'.
+    - Se caminho == [] (top-level), retorna as categorias de topo filtradas.
+    - Caso não haja correspondência de filtro, faz fallback para catalogo.obter_opcoes(caminho).
+    """
+    # top-level: reutilizar categorias_para_itens
+    if not caminho:
+        return categorias_para_itens(itens)
+
+    node = _obter_no_por_caminho(caminho)
+    if node is None:
+        # não conseguimos navegar até o nó; fallback
+        return catalogo.obter_opcoes(caminho)
+
+    opts = []
+    seen = set()
+
+    # produtos diretamente no nó
+    produtos = node.get("produtos")
+    if isinstance(produtos, list):
+        for p in produtos:
+            if p in itens and p not in seen:
+                opts.append(p)
+                seen.add(p)
+
+    # subcategorias e grupos
+    for container in ("subcategorias", "grupos"):
+        cont = node.get(container)
+        if isinstance(cont, dict):
+            for sk, sn in cont.items():
+                # se algum produto da lista estiver dentro da sub-árvore
+                if any(_buscar_produto_recursivo(sn, prod) for prod in itens):
+                    if sk not in seen:
+                        opts.append(sk)
+                        seen.add(sk)
+
+    # outros filhos dict (arquiteturas variadas)
+    for k, v in node.items():
+        if k in ("produtos", "subcategorias", "grupos"):
+            continue
+        if isinstance(v, dict):
+            if any(_buscar_produto_recursivo(v, prod) for prod in itens):
+                if k not in seen:
+                    opts.append(k)
+                    seen.add(k)
+
+    if not opts:
+        # fallback para mostrar tudo no nível atual
+        return catalogo.obter_opcoes(caminho)
+
+    return opts
 
 
 async def voltar_para_origem(message: types.Message, state: FSMContext):
@@ -276,8 +364,9 @@ async def list_chosen(message: types.Message, state: FSMContext):
         # inicia navegação no catálogo para adicionar itens
         await state.set_state(ListaState.navegando_catalogo)
         # preservar menu_origin existente (geralmente 'cadastro')
-        await state.update_data(caminho=[], lista_nome=lista_nome)
-        opts = list(catalogo.CATALOGO.keys())
+        # armazena também os itens da lista para filtragem dinâmica
+        await state.update_data(caminho=[], lista_nome=lista_nome, lista_itens=itens)
+        opts = opcoes_filtradas_para_itens([], itens)
         # mostrar categorias com botão Voltar (sempre)
         return await message.answer("Escolha a categoria:", reply_markup=kb_opcoes(opts, True))
 
@@ -288,7 +377,7 @@ async def list_chosen(message: types.Message, state: FSMContext):
         return await voltar_para_origem(message, state)
     await state.set_state(ListaState.compra_navegando)
     await state.update_data(itens_pendentes=itens, caminho=[])
-    # mostrar apenas categorias que contêm os produtos da lista
+    # mostrar apenas categorias que contêm os produtos da lista (top-level)
     categorias_filtradas = categorias_para_itens(itens)
     return await message.answer(f"Iniciando compra: {lista_nome}", reply_markup=kb_opcoes(categorias_filtradas, True))
 
@@ -297,6 +386,7 @@ async def list_chosen(message: types.Message, state: FSMContext):
 async def nav_add(message: types.Message, state: FSMContext):
     data = await state.get_data()
     caminho = data.get("caminho", [])
+    lista_itens = data.get("lista_itens", [])
 
     # "⬅️ Voltar": se em nível interno -> sobe um nível; se no topo -> volta para menu de origem
     if message.text == "⬅️ Voltar":
@@ -304,7 +394,7 @@ async def nav_add(message: types.Message, state: FSMContext):
             return await voltar_para_origem(message, state)
         caminho.pop()
         await state.update_data(caminho=caminho)
-        opts = list(catalogo.CATALOGO.keys()) if not caminho else catalogo.obter_opcoes(caminho)
+        opts = opcoes_filtradas_para_itens(caminho, lista_itens)
         # sempre mostrar '⬅️ Voltar' nas categorias
         return await message.answer("Selecione:", reply_markup=kb_opcoes(opts, True))
 
@@ -314,7 +404,8 @@ async def nav_add(message: types.Message, state: FSMContext):
     if tipo == "categoria":
         caminho.append(chave)
         await state.update_data(caminho=caminho)
-        await message.answer("Selecione:", reply_markup=kb_opcoes(catalogo.obter_opcoes(caminho), True))
+        opts = opcoes_filtradas_para_itens(caminho, lista_itens)
+        await message.answer("Selecione:", reply_markup=kb_opcoes(opts, True))
         return
 
     if tipo == "produto":
@@ -335,9 +426,10 @@ async def nav_add(message: types.Message, state: FSMContext):
 
         # NÃO resetar 'caminho' — permanece no mesmo nível para poder adicionar mais itens naquele lugar
         caminho_atual = data.get("caminho", [])
-        opts = list(catalogo.CATALOGO.keys()) if not caminho_atual else catalogo.obter_opcoes(caminho_atual)
+        # atualizar lista_itens no estado e recomputar opções filtradas
+        await state.update_data(lista_itens=itens_atualizados, caminho=caminho_atual, lista_nome=lista_nome)
+        opts = opcoes_filtradas_para_itens(caminho_atual, itens_atualizados)
         await state.set_state(ListaState.navegando_catalogo)
-        await state.update_data(caminho=caminho_atual, lista_nome=lista_nome)
         return await message.answer("Deseja adicionar mais itens? Selecione:", reply_markup=kb_opcoes(opts, True))
 
     await message.answer("Escolha inválida.")
@@ -363,7 +455,9 @@ async def compra_navegar(message: types.Message, state: FSMContext):
     if tipo == "categoria":
         caminho.append(chave)
         await state.update_data(caminho=caminho)
-        await message.answer("Selecione:", reply_markup=kb_opcoes(catalogo.obter_opcoes(caminho), True))
+        # mostrar apenas opções filtradas com base nos itens_pendentes
+        opts = opcoes_filtradas_para_itens(caminho, itens_pendentes)
+        await message.answer("Selecione:", reply_markup=kb_opcoes(opts, True))
         return
 
     if tipo == "produto":
