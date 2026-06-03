@@ -305,9 +305,18 @@ async def set_valor(message: types.Message, state: FSMContext):
         dep_id, *_ = await get_dep_data(state)
         if not dep_id:
             return await message.answer("Envie /start e escolha um departamento primeiro.")
+        # adiciona ao carrinho (mantendo a assinatura existente)
         await database.adicionar_ao_carrinho(message.from_user.id, dep_id, produto, qtd, valor)
-        await state.clear()
-        await message.answer(f"✅ {catalogo.formatar(produto)} adicionado!", reply_markup=kb_menu_principal())
+
+        # NÃO limpar o estado: voltar para navegação para permitir adicionar mais itens
+        await state.set_state(ShopState.navegando)
+        await state.update_data(caminho=[])
+
+        opts = list(catalogo.CATALOGO.keys())
+        return await message.answer(
+            f"✅ {catalogo.formatar(produto)} adicionado! Deseja adicionar mais itens?",
+            reply_markup=kb_opcoes(opts, False),
+        )
     except Exception:
         await message.answer("Valor inválido.")
 
