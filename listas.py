@@ -237,7 +237,7 @@ def opcoes_filtradas_para_itens(caminho, itens):
 async def voltar_para_origem(message: types.Message, state: FSMContext):
     """
     Retorna o usuário para o menu de onde ele veio, baseado em `menu_origin` no estado.
-    - 'compras' -> retorna ao menu de compras (sai da seleção de listas)
+    - 'compras' -> retorna ao menu de compras (mostra opções de compras)
     - 'cadastro' (padrão) -> retorna ao gerenciador de listas (kb_listas_menu)
     """
     data = await state.get_data()
@@ -245,9 +245,17 @@ async def voltar_para_origem(message: types.Message, state: FSMContext):
     dep_id, _ = await get_dep_from_state(state)
 
     if origin == "compras":
-        # voltar para o menu de compras (preservando departamento)
+        # preservar departamento no estado e mostrar o menu de compras
         await limpar_estado_preservando_departamento(state)
-        return await message.answer("🛒 Menu de Compras:", reply_markup=kb_menu())
+        kb_compras = ReplyKeyboardMarkup(
+            keyboard=[
+                [KeyboardButton(text="🛒 Compra Avulsa"), KeyboardButton(text="📋 Minhas Listas")],
+                [KeyboardButton(text="📦 Ver Carrinho")],
+                [KeyboardButton(text="⬅️ Menu Principal")],
+            ],
+            resize_keyboard=True,
+        )
+        return await message.answer("🛒 Menu de Compras:", reply_markup=kb_compras)
     else:
         # origem cadastro/gerenciador -> voltar ao gerenciador de listas
         await state.set_state(ListaState.escolhendo_lista)
