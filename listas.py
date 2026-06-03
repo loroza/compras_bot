@@ -412,9 +412,10 @@ async def list_chosen(message: types.Message, state: FSMContext):
         # inicia navegação no catálogo para adicionar itens
         await state.set_state(ListaState.navegando_catalogo)
         # preservar menu_origin existente (geralmente 'cadastro')
-        # armazena também os itens da lista para filtragem dinâmica
-        await state.update_data(caminho=[], lista_nome=lista_nome, lista_itens=itens)
-        opts = opcoes_filtradas_para_itens([], itens)
+        # armazena também os itens da lista (para possíveis usos futuros)
+        await state.update_data(caminho=[], lista_nome=lista_nome, lista_itens=itens, acao="adicionar")
+        # NO fluxo de CADASTRO/ADICIONAR mostramos TODAS as categorias/subcategorias
+        opts = catalogo.obter_opcoes([])
         # mostrar categorias com botão Voltar (sempre)
         return await message.answer("Escolha a categoria:", reply_markup=kb_opcoes(opts, True))
 
@@ -442,7 +443,13 @@ async def nav_add(message: types.Message, state: FSMContext):
             return await voltar_para_origem(message, state)
         caminho.pop()
         await state.update_data(caminho=caminho)
-        opts = opcoes_filtradas_para_itens(caminho, lista_itens)
+        # decide se exibe todas as opções (cadastro) ou filtra (compras)
+        acao = data.get("acao")
+        menu_origin = data.get("menu_origin", "")
+        if acao == "adicionar" or menu_origin == "cadastro":
+            opts = catalogo.obter_opcoes(caminho)
+        else:
+            opts = opcoes_filtradas_para_itens(caminho, lista_itens)
         # sempre mostrar '⬅️ Voltar' nas categorias
         return await message.answer("Selecione:", reply_markup=kb_opcoes(opts, True))
 
@@ -452,7 +459,13 @@ async def nav_add(message: types.Message, state: FSMContext):
     if tipo == "categoria":
         caminho.append(chave)
         await state.update_data(caminho=caminho)
-        opts = opcoes_filtradas_para_itens(caminho, lista_itens)
+        # decide se mostra tudo (cadastro) ou filtra (compras)
+        acao = data.get("acao")
+        menu_origin = data.get("menu_origin", "")
+        if acao == "adicionar" or menu_origin == "cadastro":
+            opts = catalogo.obter_opcoes(caminho)
+        else:
+            opts = opcoes_filtradas_para_itens(caminho, lista_itens)
         await message.answer("Selecione:", reply_markup=kb_opcoes(opts, True))
         return
 
@@ -474,9 +487,14 @@ async def nav_add(message: types.Message, state: FSMContext):
 
         # NÃO resetar 'caminho' — permanece no mesmo nível para poder adicionar mais itens naquele lugar
         caminho_atual = data.get("caminho", [])
-        # atualizar lista_itens no estado e recomputar opções filtradas
+        # atualizar lista_itens no estado e recomputar opções (respeitando cadastro vs compras)
         await state.update_data(lista_itens=itens_atualizados, caminho=caminho_atual, lista_nome=lista_nome)
-        opts = opcoes_filtradas_para_itens(caminho_atual, itens_atualizados)
+        acao = data.get("acao")
+        menu_origin = data.get("menu_origin", "")
+        if acao == "adicionar" or menu_origin == "cadastro":
+            opts = catalogo.obter_opcoes(caminho_atual)
+        else:
+            opts = opcoes_filtradas_para_itens(caminho_atual, itens_atualizados)
         await state.set_state(ListaState.navegando_catalogo)
         return await message.answer("Deseja adicionar mais itens? Selecione:", reply_markup=kb_opcoes(opts, True))
 
@@ -539,7 +557,7 @@ async def compra_set_valor(message: types.Message, state: FSMContext):
         dep_id, _ = await get_dep_from_state(state)
         if not dep_id:
             await state.clear()
-            return await message.answer("Envie /start e escolha um departamento primeiro.")
+            return await message.answer("Envie /start e escolha o departamento primeiro.")
         # adiciona ao carrinho do usuário
         await database.adicionar_ao_carrinho(message.from_user.id, dep_id, produto, qtd, valor)
 
