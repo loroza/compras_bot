@@ -98,6 +98,29 @@ def encontrar_item_raw_por_label(itens: list, label: str):
     return None
 
 
+async def voltar_para_origem(message: types.Message, state: FSMContext):
+    """
+    Retorna o usuário para o menu de onde ele veio, baseado em `menu_origin` no estado.
+    - 'compras' -> retorna à seleção de listas para INICIAR COMPRA (escolhendo_lista com acao=iniciar_compra)
+    - 'cadastro' (padrão) -> retorna ao gerenciador de listas (kb_listas_menu)
+    """
+    data = await state.get_data()
+    origin = data.get("menu_origin", "cadastro")
+    dep_id, _ = await get_dep_from_state(state)
+
+    if origin == "compras":
+        # voltar para seleção de listas com ação de iniciar compra
+        listas = await database.pegar_listas_disponiveis(dep_id) if dep_id else []
+        await state.set_state(ListaState.escolhendo_lista)
+        await state.update_data(acao="iniciar_compra", menu_origin="compras")
+        return await message.answer("Selecione a lista para iniciar a compra:", reply_markup=kb_lista_escolha(listas))
+    else:
+        # origem cadastro/gerenciador -> voltar ao gerenciador de listas
+        # preserva departamento
+        await limpar_estado_preservando_departamento(state)
+        return await message.answer("Gerenciar Listas:", reply_markup=kb_listas_menu(allow_iniciar=False))
+
+
 # --- HANDLERS ---
 
 # Finalizar: único comando que realmente finaliza/limpa tudo
@@ -116,8 +139,9 @@ async def listas_minhas_compras(message: types.Message, state: FSMContext):
     listas = await database.pegar_listas_disponiveis(dep_id)
     if not listas:
         return await message.answer("Não há listas. Crie uma lista primeiro!", reply_markup=kb_listas_menu(allow_iniciar=False))
+    # marcar origem como compras
     await state.set_state(ListaState.escolhendo_lista)
-    await state.update_data(acao="iniciar_compra")
+    await state.update_data(acao="iniciar_compra", menu_origin="compras")
     await message.answer("Selecione a lista para iniciar a compra:", reply_markup=kb_lista_escolha(listas))
 
 
@@ -127,6 +151,9 @@ async def listas_cadastros_manager(message: types.Message, state: FSMContext):
     dep_id, _ = await get_dep_from_state(state)
     if not dep_id:
         return await message.answer("Envie /start e escolha um departamento primeiro.")
+    # marcar origem como cadastro (gerenciador)
+    await state.set_state(ListaState.escolhendo_lista)
+    await state.update_data(menu_origin="cadastro")
     await message.answer("Gerenciar Listas:", reply_markup=kb_listas_menu(allow_iniciar=False))
 
 
@@ -168,17 +195,17 @@ async def add_item_start(message: types.Message, state: FSMContext):
     listas = await database.pegar_listas_disponiveis(dep_id)
     if not listas:
         return await message.answer("Crie uma lista primeiro!", reply_markup=kb_listas_menu())
+    # marcar origem como cadastro (adicionar itens é parte do gerenciador)
     await state.set_state(ListaState.escolhendo_lista)
-    await state.update_data(acao="adicionar")
+    await state.update_data(acao="adicionar", menu_origin="cadastro")
     await message.answer("Selecione a lista:", reply_markup=kb_lista_escolha(listas))
 
 
 @router.message(ListaState.escolhendo_lista)
 async def list_chosen(message: types.Message, state: FSMContext):
-    # "⬅️ Voltar" deve retornar ao menu de gerenciamento de listas (não finalizar)
+    # "⬅️ Voltar" deve retornar ao menu de origem (não finalizar)
     if message.text == "⬅️ Voltar":
-        await limpar_estado_preservando_departamento(state)
-        return await message.answer("Gerenciar Listas:", reply_markup=kb_listas_menu())
+        return await voltar_para_origem(message, state)
 
     data = await state.get_data()
     dep_id, _ = await get_dep_from_state(state)
@@ -200,6 +227,7 @@ async def list_chosen(message: types.Message, state: FSMContext):
         await message.answer(f"Extrato atual da lista *{lista_nome}*:\n\n{extrato}", parse_mode="Markdown")
         # inicia navegação no catálogo para adicionar itens
         await state.set_state(ListaState.navegando_catalogo)
+        # preservar menu_origin existente (geralmente 'cadastro')
         await state.update_data(caminho=[], lista_nome=lista_nome)
         opts = list(catalogo.CATALOGO.keys())
         # mostrar categorias com botão Voltar (sempre)
@@ -208,8 +236,8 @@ async def list_chosen(message: types.Message, state: FSMContext):
     # caso iniciar compra
     itens = await database.pegar_itens_da_lista(lista_row["id"])
     if not itens:
-        await state.clear()
-        return await message.answer("Lista vazia!", reply_markup=kb_listas_menu())
+        # se lista vazia, voltar para menu de origem (preservando fluxo)
+        return await voltar_para_origem(message, state)
     await state.set_state(ListaState.compra_navegando)
     await state.update_data(itens_pendentes=itens, caminho=[])
     return await message.answer(f"Iniciando compra: {lista_nome}", reply_markup=kb_opcoes(list(catalogo.CATALOGO.keys()), True))
@@ -220,17 +248,10 @@ async def nav_add(message: types.Message, state: FSMContext):
     data = await state.get_data()
     caminho = data.get("caminho", [])
 
-    # "⬅️ Voltar": se em nível interno -> sobe um nível; se no topo -> volta para seleção de listas
+    # "⬅️ Voltar": se em nível interno -> sobe um nível; se no topo -> volta para menu de origem
     if message.text == "⬅️ Voltar":
         if not caminho:
-            # volta para seleção de listas (manter o fluxo de gerenciamento de listas)
-            dep_id, _ = await get_dep_from_state(state)
-            if not dep_id:
-                await limpar_estado_preservando_departamento(state)
-                return await message.answer("Gerenciar Listas:", reply_markup=kb_listas_menu())
-            listas = await database.pegar_listas_disponiveis(dep_id)
-            await state.set_state(ListaState.escolhendo_lista)
-            return await message.answer("Selecione a lista:", reply_markup=kb_lista_escolha(listas))
+            return await voltar_para_origem(message, state)
         caminho.pop()
         await state.update_data(caminho=caminho)
         opts = list(catalogo.CATALOGO.keys()) if not caminho else catalogo.obter_opcoes(caminho)
@@ -275,24 +296,17 @@ async def nav_add(message: types.Message, state: FSMContext):
 # --- FLUXO: iniciar compra a partir da lista (itens_pendentes) ---
 @router.message(ListaState.compra_navegando)
 async def compra_navegar(message: types.Message, state: FSMContext):
-    # "⬅️ Voltar" deve retornar para seleção de listas (não finalizar)
+    # "⬅️ Voltar" deve retornar para menu de origem (ex.: seleção de listas para iniciar compra)
     if message.text == "⬅️ Voltar":
-        dep_id, _ = await get_dep_from_state(state)
-        if not dep_id:
-            await limpar_estado_preservando_departamento(state)
-            return await message.answer("Gerenciar Listas:", reply_markup=kb_listas_menu())
-        listas = await database.pegar_listas_disponiveis(dep_id)
-        await state.set_state(ListaState.escolhendo_lista)
-        return await message.answer("Selecione a lista:", reply_markup=kb_lista_escolha(listas))
+        return await voltar_para_origem(message, state)
 
     data = await state.get_data()
     caminho = data.get("caminho", [])
     itens_pendentes = data.get("itens_pendentes", [])
 
     if message.text == "❌ Cancelar":
-        # cancelar volta ao menu de listas (manter fluxo)
-        await limpar_estado_preservando_departamento(state)
-        return await message.answer("Operação cancelada.", reply_markup=kb_listas_menu())
+        # cancelar volta para menu de origem
+        return await voltar_para_origem(message, state)
 
     escolha = message.text.strip()
     tipo, chave = catalogo.identificar_escolha(caminho, escolha)
@@ -349,11 +363,8 @@ async def compra_set_valor(message: types.Message, state: FSMContext):
             await state.update_data(caminho=[])
             await message.answer(f"✅ {catalogo.formatar(produto)} adicionado! Próximo item:", reply_markup=kb_opcoes(list(catalogo.CATALOGO.keys()), True))
         else:
-            # quando todos adicionados, voltar ao menu de listas (manter fluxo)
-            await state.set_state(ListaState.escolhendo_lista)
-            dep_id, _ = await get_dep_from_state(state)
-            listas = await database.pegar_listas_disponiveis(dep_id) if dep_id else []
-            return await message.answer("✅ Todos os itens da lista foram adicionados ao carrinho!\nSelecione outra lista ou volte.", reply_markup=kb_lista_escolha(listas) if listas else kb_listas_menu())
+            # quando todos adicionados, voltar ao menu de origem (provavelmente seleção de listas)
+            return await voltar_para_origem(message, state)
     except Exception:
         await message.answer("Valor inválido.")
 
@@ -367,17 +378,18 @@ async def remover_item_start(message: types.Message, state: FSMContext):
     listas = await database.pegar_listas_disponiveis(dep_id)
     if not listas:
         return await message.answer("Não há listas para remover itens.", reply_markup=kb_listas_menu())
+    # marcar origem como cadastro (remoção faz parte do gerenciador)
     await state.set_state(ListaState.escolhendo_lista_remover)
+    await state.update_data(menu_origin="cadastro")
     await message.answer("Selecione a lista:", reply_markup=kb_lista_escolha(listas))
 
 
 @router.message(ListaState.escolhendo_lista_remover)
 async def remover_item_lista_handler(message: types.Message, state: FSMContext):
     dep_id, _ = await get_dep_from_state(state)
-    # "⬅️ Voltar" retorna ao menu de gerenciamento de listas (não finaliza)
+    # "⬅️ Voltar" retorna ao menu de origem
     if message.text == "⬅️ Voltar":
-        await limpar_estado_preservando_departamento(state)
-        return await message.answer("Gerenciar Listas:", reply_markup=kb_listas_menu())
+        return await voltar_para_origem(message, state)
 
     lista_row = await database.buscar_lista_por_nome(dep_id, message.text)
     if not lista_row:
@@ -386,8 +398,10 @@ async def remover_item_lista_handler(message: types.Message, state: FSMContext):
 
     itens = await database.pegar_itens_da_lista(lista_row["id"])
     if not itens:
+        # permanece no fluxo de escolha de listas para remover (mas mantendo origem)
+        listas = await database.pegar_listas_disponiveis(dep_id)
         await state.set_state(ListaState.escolhendo_lista_remover)
-        return await message.answer("Lista vazia. Selecione outra lista:", reply_markup=kb_lista_escolha(await database.pegar_listas_disponiveis(dep_id)))
+        return await message.answer("Lista vazia. Selecione outra lista:", reply_markup=kb_lista_escolha(listas))
 
     btns = [[KeyboardButton(text=catalogo.formatar(i))] for i in itens]
     btns.append([KeyboardButton(text="⬅️ Voltar")])
@@ -404,11 +418,9 @@ async def confirmar_remover_item(message: types.Message, state: FSMContext):
     lista_nome = data.get("lista_nome")
     dep_id = data.get("departamento_id")
 
-    # "⬅️ Voltar": voltar para seleção de listas para remover (não finalizar)
+    # "⬅️ Voltar": voltar para seleção de listas para remover (ou menu de origem)
     if message.text == "⬅️ Voltar":
-        listas = await database.pegar_listas_disponiveis(dep_id)
-        await state.set_state(ListaState.escolhendo_lista_remover)
-        return await message.answer("Selecione a lista:", reply_markup=kb_lista_escolha(listas))
+        return await voltar_para_origem(message, state)
 
     itens_atuais = await database.pegar_itens_da_lista(lista_id)
     item_raw = encontrar_item_raw_por_label(itens_atuais, message.text)
@@ -423,13 +435,8 @@ async def confirmar_remover_item(message: types.Message, state: FSMContext):
     itens_restantes = await database.pegar_itens_da_lista(lista_id)
 
     if not itens_restantes:
-        # voltar para seleção de listas para remover (manter fluxo)
-        listas = await database.pegar_listas_disponiveis(dep_id)
-        await state.set_state(ListaState.escolhendo_lista_remover)
-        return await message.answer(
-            f"✅ {catalogo.formatar(item_raw)} removido da lista *{lista_nome}*.\n\nA lista está vazia. Selecione outra lista:",
-            reply_markup=kb_lista_escolha(listas)
-        )
+        # quando a lista ficou vazia, voltar para menu de origem (escolha de listas)
+        return await voltar_para_origem(message, state)
 
     btns = [[KeyboardButton(text=catalogo.formatar(i))] for i in itens_restantes]
     btns.append([KeyboardButton(text="⬅️ Voltar")])
