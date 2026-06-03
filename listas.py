@@ -48,8 +48,8 @@ def kb_listas_menu(allow_iniciar: bool = True):
 
 def kb_opcoes(lista, voltar: bool = True):
     """
-    Lista de opções do catálogo. Substitui o botão de cancelar por '⬅️ Voltar'.
-    Se voltar == False, não inclui o botão '⬅️ Voltar'.
+    Lista de opções do catálogo.
+    Se voltar == True, inclui o botão '⬅️ Voltar' (sobe um nível ou sai do fluxo).
     """
     btns = [[KeyboardButton(text=catalogo.formatar(opt))] for opt in lista]
     if voltar:
@@ -152,6 +152,8 @@ async def add_item_start(message: types.Message, state: FSMContext):
         return await message.answer("Crie uma lista primeiro!", reply_markup=kb_listas_menu())
     await state.set_state(ListaState.escolhendo_lista)
     await state.update_data(acao="adicionar")
+    # mostrar categorias com opção de voltar
+    opts = list(catalogo.CATALOGO.keys())
     await message.answer("Selecione a lista:", reply_markup=kb_lista_escolha(listas))
 
 
@@ -184,7 +186,8 @@ async def list_chosen(message: types.Message, state: FSMContext):
         await state.set_state(ListaState.navegando_catalogo)
         await state.update_data(caminho=[], lista_nome=lista_nome)
         opts = list(catalogo.CATALOGO.keys())
-        return await message.answer("Escolha a categoria:", reply_markup=kb_opcoes(opts, False))
+        # agora inclui "⬅️ Voltar" no menu de categorias
+        return await message.answer("Escolha a categoria:", reply_markup=kb_opcoes(opts, True))
 
     # caso iniciar compra
     itens = await database.pegar_itens_da_lista(lista_row["id"])
@@ -193,7 +196,7 @@ async def list_chosen(message: types.Message, state: FSMContext):
         return await message.answer("Lista vazia!", reply_markup=kb_listas_menu())
     await state.set_state(ListaState.compra_navegando)
     await state.update_data(itens_pendentes=itens, caminho=[])
-    return await message.answer(f"Iniciando compra: {lista_nome}", reply_markup=kb_opcoes(list(catalogo.CATALOGO.keys()), False))
+    return await message.answer(f"Iniciando compra: {lista_nome}", reply_markup=kb_opcoes(list(catalogo.CATALOGO.keys()), True))
 
 
 @router.message(ListaState.navegando_catalogo)
@@ -220,7 +223,7 @@ async def nav_add(message: types.Message, state: FSMContext):
     if tipo == "categoria":
         caminho.append(chave)
         await state.update_data(caminho=caminho)
-        await message.answer("Selecione:", reply_markup=kb_opcoes(catalogo.obter_opcoes(caminho)))
+        await message.answer("Selecione:", reply_markup=kb_opcoes(catalogo.obter_opcoes(caminho), True))
         return
 
     if tipo == "produto":
@@ -239,11 +242,14 @@ async def nav_add(message: types.Message, state: FSMContext):
         extrato = montar_extrato_texto(itens_atualizados)
         await message.answer(f"✅ {catalogo.formatar(chave)} adicionado à lista *{lista_nome}*!\n\nExtrato atualizado:\n\n{extrato}", parse_mode="Markdown")
 
-        # manter no fluxo de adicionar itens: resetar caminho para o topo e oferecer opções novamente
+        # NÃO resetar 'caminho' — permanece no mesmo nível para poder adicionar mais itens naquele lugar
+        # obter opções no mesmo nível (se vazio, mostra categorias principais)
+        caminho_atual = data.get("caminho", [])
+        opts = list(catalogo.CATALOGO.keys()) if not caminho_atual else catalogo.obter_opcoes(caminho_atual)
         await state.set_state(ListaState.navegando_catalogo)
-        await state.update_data(caminho=[], lista_nome=lista_nome)
-        opts = list(catalogo.CATALOGO.keys())
-        return await message.answer("Deseja adicionar mais itens? Selecione a categoria:", reply_markup=kb_opcoes(opts, False))
+        # atualizar dados (mantendo lista_nome e caminho)
+        await state.update_data(caminho=caminho_atual, lista_nome=lista_nome)
+        return await message.answer("Deseja adicionar mais itens? Selecione:", reply_markup=kb_opcoes(opts, True))
 
     await message.answer("Escolha inválida.")
 
@@ -270,7 +276,7 @@ async def compra_navegar(message: types.Message, state: FSMContext):
     if tipo == "categoria":
         caminho.append(chave)
         await state.update_data(caminho=caminho)
-        await message.answer("Selecione:", reply_markup=kb_opcoes(catalogo.obter_opcoes(caminho)))
+        await message.answer("Selecione:", reply_markup=kb_opcoes(catalogo.obter_opcoes(caminho), True))
         return
 
     if tipo == "produto":
@@ -318,7 +324,7 @@ async def compra_set_valor(message: types.Message, state: FSMContext):
         if itens_pendentes:
             await state.set_state(ListaState.compra_navegando)
             await state.update_data(caminho=[])
-            await message.answer(f"✅ {catalogo.formatar(produto)} adicionado! Próximo item:", reply_markup=kb_opcoes(list(catalogo.CATALOGO.keys()), False))
+            await message.answer(f"✅ {catalogo.formatar(produto)} adicionado! Próximo item:", reply_markup=kb_opcoes(list(catalogo.CATALOGO.keys()), True))
         else:
             await state.clear()
             await message.answer("✅ Todos os itens da lista foram adicionados ao carrinho!", reply_markup=kb_listas_menu())
