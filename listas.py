@@ -30,15 +30,23 @@ def kb_menu():
     )
 
 
-def kb_listas_menu():
-    return ReplyKeyboardMarkup(
-        keyboard=[
-            [KeyboardButton(text="➕ Nova Lista")],
-            [KeyboardButton(text="📝 Adicionar Itens"), KeyboardButton(text="🚀 Iniciar Compra")],
-            [KeyboardButton(text="🗑️ Remover Item"), KeyboardButton(text="⬅️ Menu Principal")],
-        ],
-        resize_keyboard=True,
-    )
+def kb_listas_menu(allow_iniciar: bool = True):
+    """
+    Retorna teclado de gerenciamento de listas.
+    Se allow_iniciar == False, não inclui o botão '🚀 Iniciar Compra'.
+    """
+    # sempre mostrar Nova Lista e Adicionar/Remover/Menu
+    rows = [
+        [KeyboardButton(text="➕ Nova Lista")],
+        [KeyboardButton(text="📝 Adicionar Itens")],
+    ]
+    # inserir botão Iniciar Compra apenas quando permitido
+    if allow_iniciar:
+        rows[-1].append(KeyboardButton(text="🚀 Iniciar Compra"))
+
+    # restante do menu
+    rows.append([KeyboardButton(text="🗑️ Remover Item"), KeyboardButton(text="⬅️ Menu Principal")])
+    return ReplyKeyboardMarkup(keyboard=rows, resize_keyboard=True)
 
 
 def kb_opcoes(lista, voltar=True):
@@ -83,10 +91,30 @@ def montar_extrato_texto(itens: list) -> str:
 # --- HANDLERS ---
 @router.message(F.text == "📋 Minhas Listas")
 async def listas_main(message: types.Message, state: FSMContext):
+    """
+    Comportamento:
+    - se state.menu_context == "compras"  -> parte direto para escolher lista para INICIAR COMPRA
+    - caso contrário (ex.: cadastro)      -> abre gerenciador de listas (sem botão 'Iniciar Compra')
+    """
     dep_id, _ = await get_dep_from_state(state)
     if not dep_id:
         return await message.answer("Envie /start e escolha um departamento primeiro.")
-    await message.answer("Gerenciar Listas:", reply_markup=kb_listas_menu())
+
+    data = await state.get_data()
+    menu_context = data.get("menu_context")
+
+    # Caso: estamos no módulo de compras -> iniciar compra (pular gerenciador)
+    if menu_context == "compras":
+        listas = await database.pegar_listas_disponiveis(dep_id)
+        if not listas:
+            return await message.answer("Não há listas. Crie uma lista primeiro!", reply_markup=kb_listas_menu(allow_iniciar=False))
+        # setar ação para que o handler list_chosen entenda que é iniciar compra
+        await state.set_state(ListaState.escolhendo_lista)
+        await state.update_data(acao="iniciar_compra")
+        return await message.answer("Selecione a lista para iniciar a compra:", reply_markup=kb_lista_escolha(listas))
+
+    # Caso padrão (cadastro ou não especificado): abrir gerenciador sem a opção Iniciar Compra
+    await message.answer("Gerenciar Listas:", reply_markup=kb_listas_menu(allow_iniciar=False))
 
 
 @router.message(F.text == "⬅️ Menu Principal")
@@ -143,36 +171,34 @@ async def list_chosen(message: types.Message, state: FSMContext):
         await state.clear()
         return await message.answer("Envie /start e escolha um departamento primeiro.")
 
-    await state.update_data(lista_nome=message.text)
-    if data.get("acao") == "adicionar":
-        # mostrar extrato da lista antes de começar a adicionar
-        lista_row = await database.buscar_lista_por_nome(dep_id, message.text)
-        if not lista_row:
-            await state.clear()
-            return await message.answer("Lista não encontrada.", reply_markup=kb_listas_menu())
+    lista_nome = message.text
+    # buscar lista no banco
+    lista_row = await database.buscar_lista_por_nome(dep_id, lista_nome)
+    if not lista_row:
+        await state.clear()
+        return await message.answer("Lista não encontrada.", reply_markup=kb_listas_menu())
 
+    # branch por ação
+    if data.get("acao") == "adicionar":
+        # mostrar extrato da lista antes de iniciar a navegação no catálogo
         itens = await database.pegar_itens_da_lista(lista_row["id"])
         extrato = montar_extrato_texto(itens)
-        await message.answer(f"Extrato atual da lista *{message.text}*:\n\n{extrato}", parse_mode="Markdown")
-        # inicia navegação no catálogo
+        await message.answer(f"Extrato atual da lista *{lista_nome}*:\n\n{extrato}", parse_mode="Markdown")
+        # inicia navegação no catálogo para adicionar itens
         await state.set_state(ListaState.navegando_catalogo)
-        await state.update_data(caminho=[])
+        await state.update_data(caminho=[], lista_nome=lista_nome)
         opts = list(catalogo.CATALOGO.keys())
-        await message.answer("Escolha a categoria:", reply_markup=kb_opcoes(opts, False))
-    else:
-        # Iniciar Compra a partir da lista
-        lista_row = await database.buscar_lista_por_nome(dep_id, message.text)
-        if not lista_row:
-            await state.clear()
-            return await message.answer("Lista não encontrada.", reply_markup=kb_listas_menu())
-        itens = await database.pegar_itens_da_lista(lista_row["id"])
-        if not itens:
-            await state.clear()
-            return await message.answer("Lista vazia!", reply_markup=kb_listas_menu())
-        # configura estado de compra a partir da lista
-        await state.set_state(ListaState.compra_navegando)
-        await state.update_data(itens_pendentes=itens, caminho=[])
-        await message.answer(f"Iniciando compra: {message.text}", reply_markup=kb_opcoes(list(catalogo.CATALOGO.keys()), False))
+        return await message.answer("Escolha a categoria:", reply_markup=kb_opcoes(opts, False))
+
+    # caso iniciar compra
+    # configura estado de compra a partir da lista
+    itens = await database.pegar_itens_da_lista(lista_row["id"])
+    if not itens:
+        await state.clear()
+        return await message.answer("Lista vazia!", reply_markup=kb_listas_menu())
+    await state.set_state(ListaState.compra_navegando)
+    await state.update_data(itens_pendentes=itens, caminho=[])
+    return await message.answer(f"Iniciando compra: {lista_nome}", reply_markup=kb_opcoes(list(catalogo.CATALOGO.keys()), False))
 
 
 @router.message(ListaState.navegando_catalogo)
