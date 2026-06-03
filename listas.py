@@ -1,4 +1,3 @@
-# (arquivo completo: listas (17).py - substitua pelo conteúdo abaixo)
 from aiogram import Router, types, F
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
@@ -166,7 +165,6 @@ def _obter_no_por_caminho(caminho):
     Retorna o nó do CATALOGO correspondente ao caminho (lista de chaves).
     Se não encontrar, retorna None.
     """
-    node = None
     if not caminho:
         # top-level: o "nó" é o catálogo inteiro (representado como dict de categorias)
         return None
@@ -324,7 +322,7 @@ async def new_list(message: types.Message, state: FSMContext):
     dep_id, _ = await get_dep_from_state(state)
     if not dep_id:
         return await message.answer("Envie /start e escolha um departamento primeiro.")
-    # primeiro pergunta o tipo da lista (Avulsa ou Fixa) - não persistimos no DB (opção A)
+    # primeiro pergunta o tipo da lista (Avulsa ou Fixa)
     await state.set_state(ListaState.criando_tipo)
     await message.answer("Qual o tipo da lista?\nEscolha 'Avulsa' (lista comum) ou 'Fixa' (lista reutilizável).", reply_markup=kb_tipo_lista())
 
@@ -424,8 +422,9 @@ async def list_chosen(message: types.Message, state: FSMContext):
     # caso iniciar compra
     itens = await database.pegar_itens_da_lista(lista_row["id"])
     if not itens:
-        # se lista vazia, voltar para menu de origem (preservando fluxo)
-        return await voltar_para_origem(message, state)
+        # se lista vazia, deletar automaticamente e voltar para origem
+        await database.deletar_lista(lista_row["id"])
+        return await message.answer("A lista estava vazia e foi excluída automaticamente.", reply_markup=kb_menu())
 
     # armazenar id/tipo da lista no estado para usar ao final da compra
     lista_id = lista_row["id"]
@@ -565,13 +564,24 @@ async def compra_set_valor(message: types.Message, state: FSMContext):
         if not dep_id:
             await state.clear()
             return await message.answer("Envie /start e escolha o departamento primeiro.")
+        lista_id = data.get("lista_id")
+
         # adiciona ao carrinho do usuário
         await database.adicionar_ao_carrinho(message.from_user.id, dep_id, produto, qtd, valor)
+
+        # se a compra faz parte de uma lista, remover o item da lista no DB
+        if lista_id:
+            await database.remover_item_lista(lista_id, produto)
 
         # remove item pendente equivalente (se presente)
         itens_pendentes = data.get("itens_pendentes", [])
         if produto in itens_pendentes:
             itens_pendentes.remove(produto)
+
+        # reconsulta itens restantes na lista (do DB) para verificar se ficou vazia
+        itens_restantes_db = []
+        if lista_id:
+            itens_restantes_db = await database.pegar_itens_da_lista(lista_id)
 
         # atualiza estado
         await state.update_data(itens_pendentes=itens_pendentes)
@@ -582,15 +592,11 @@ async def compra_set_valor(message: types.Message, state: FSMContext):
             opts = categorias_para_itens(itens_pendentes)
             await message.answer(f"✅ {catalogo.formatar(produto)} adicionado! Próximo item:", reply_markup=kb_opcoes(opts, True))
         else:
-            # quando todos adicionados, verificar se a lista é avulsa e removê-la automaticamente
-            lista_id = data.get("lista_id")
-            lista_tipo = data.get("lista_tipo", "avulsa")
-
-            if lista_id and lista_tipo == "avulsa":
-                # tenta deletar do DB
+            # quando todos adicionados, se a lista (no DB) está vazia -> deletar automaticamente
+            if lista_id and not itens_restantes_db:
                 deleted = await database.deletar_lista(lista_id)
                 if deleted:
-                    await message.answer("✅ Todos os itens comprados — lista avulsa removida.")
+                    await message.answer("✅ Todos os itens comprados — a lista foi removida automaticamente.")
                 else:
                     await message.answer("✅ Compra finalizada. (Não foi possível remover automaticamente a lista.)")
             else:
@@ -630,10 +636,13 @@ async def remover_item_lista_handler(message: types.Message, state: FSMContext):
 
     itens = await database.pegar_itens_da_lista(lista_row["id"])
     if not itens:
-        # permanece no fluxo de escolha de listas para remover (mas mantendo origem)
+        # lista vazia -> deletar automaticamente conforme regra e informar
+        await database.deletar_lista(lista_row["id"])
         listas = await database.pegar_listas_disponiveis(dep_id)
+        if not listas:
+            return await message.answer("A lista estava vazia e foi excluída automaticamente. Não há mais listas.", reply_markup=kb_listas_menu(allow_iniciar=False))
         await state.set_state(ListaState.escolhendo_lista_remover)
-        return await message.answer("Lista vazia. Selecione outra lista:", reply_markup=kb_lista_escolha(listas))
+        await message.answer("A lista estava vazia e foi excluída automaticamente. Selecione outra lista:", reply_markup=kb_lista_escolha(listas))
 
     btns = [[KeyboardButton(text=catalogo.formatar(i))] for i in itens]
     btns.append([KeyboardButton(text="⬅️ Voltar")])
@@ -667,8 +676,12 @@ async def confirmar_remover_item(message: types.Message, state: FSMContext):
     itens_restantes = await database.pegar_itens_da_lista(lista_id)
 
     if not itens_restantes:
-        # quando a lista ficou vazia, voltar para menu de origem (escolha de listas)
-        return await voltar_para_origem(message, state)
+        # quando a lista ficou vazia, deletar automaticamente e informar
+        deleted = await database.deletar_lista(lista_id)
+        if deleted:
+            return await message.answer(f"✅ {catalogo.formatar(item_raw)} removido. A lista *{lista_nome}* ficou vazia e foi excluída.", parse_mode="Markdown")
+        else:
+            return await message.answer(f"✅ {catalogo.formatar(item_raw)} removido. A lista ficou vazia, mas não foi possível removê-la automaticamente.", parse_mode="Markdown")
 
     btns = [[KeyboardButton(text=catalogo.formatar(i))] for i in itens_restantes]
     btns.append([KeyboardButton(text="⬅️ Voltar")])
