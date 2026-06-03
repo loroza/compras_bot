@@ -194,6 +194,7 @@ async def list_chosen(message: types.Message, state: FSMContext):
         await state.set_state(ListaState.navegando_catalogo)
         await state.update_data(caminho=[], lista_nome=lista_nome)
         opts = list(catalogo.CATALOGO.keys())
+        # mostrar categorias com botão Voltar
         return await message.answer("Escolha a categoria:", reply_markup=kb_opcoes(opts, True))
 
     # caso iniciar compra
@@ -222,7 +223,8 @@ async def nav_add(message: types.Message, state: FSMContext):
         caminho.pop()
         await state.update_data(caminho=caminho)
         opts = list(catalogo.CATALOGO.keys()) if not caminho else catalogo.obter_opcoes(caminho)
-        return await message.answer("Selecione:", reply_markup=kb_opcoes(opts, len(caminho) > 0))
+        # sempre mostrar '⬅️ Voltar' nas categorias
+        return await message.answer("Selecione:", reply_markup=kb_opcoes(opts, True))
 
     escolha = message.text.strip()
     tipo, chave = catalogo.identificar_escolha(caminho, escolha)
@@ -400,10 +402,12 @@ async def confirmar_remover_item(message: types.Message, state: FSMContext):
     itens_restantes = await database.pegar_itens_da_lista(lista_id)
 
     if not itens_restantes:
-        await state.clear()
+        # agora VOLTAR ao menu anterior (seleção de listas) em vez de finalizar/limpar o estado
+        listas = await database.pegar_listas_disponiveis(dep_id)
+        await state.set_state(ListaState.escolhendo_lista_remover)
         return await message.answer(
-            f"✅ {catalogo.formatar(item_raw)} removido da lista *{lista_nome}*.\n\nA lista está vazia.",
-            reply_markup=kb_listas_menu()
+            f"✅ {catalogo.formatar(item_raw)} removido da lista *{lista_nome}*.\n\nA lista está vazia. Selecione outra lista:",
+            reply_markup=kb_lista_escolha(listas)
         )
 
     btns = [[KeyboardButton(text=catalogo.formatar(i))] for i in itens_restantes]
