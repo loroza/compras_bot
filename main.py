@@ -147,11 +147,17 @@ def kb_confirmar():
     )
 
 
-def kb_opcoes(lista, voltar=True):
+def kb_opcoes(lista, voltar=True, cancelar=False):
+    """
+    Gera teclado de opções do catálogo.
+    - voltar: inclui botão "⬅️ Voltar" se True
+    - cancelar: inclui botão "❌ Cancelar" se True (por padrão False)
+    """
     btns = [[KeyboardButton(text=catalogo.formatar(opt))] for opt in lista]
     if voltar:
         btns.append([KeyboardButton(text="⬅️ Voltar")])
-    btns.append([KeyboardButton(text="❌ Cancelar")])
+    if cancelar:
+        btns.append([KeyboardButton(text="❌ Cancelar")])
     return ReplyKeyboardMarkup(keyboard=btns, resize_keyboard=True)
 
 
@@ -378,7 +384,8 @@ async def start_buy(message: types.Message, state: FSMContext):
     await state.set_state(ShopState.navegando)
     await state.update_data(caminho=[])
     opts = list(catalogo.CATALOGO.keys())
-    await message.answer("Escolha a categoria:", reply_markup=kb_opcoes(opts, True))
+    # não incluir botão Cancelar aqui
+    await message.answer("Escolha a categoria:", reply_markup=kb_opcoes(opts, False))
 
 
 @dp.message(ShopState.navegando)
@@ -388,16 +395,13 @@ async def navegar(message: types.Message, state: FSMContext):
 
     if message.text == "⬅️ Voltar":
         if not caminho:
-            await state.clear()
-            return await message.answer("Menu Principal:", reply_markup=kb_menu_principal())
+            # voltar para Menu de Compras (preservando departamento e sem limpar estado)
+            await state.set_state(MainState.menu_principal)
+            return await message.answer("🛒 Menu de Compras:", reply_markup=kb_menu_compras())
         caminho.pop()
         await state.update_data(caminho=caminho)
         opts = list(catalogo.CATALOGO.keys()) if not caminho else catalogo.obter_opcoes(caminho)
         return await message.answer("Voltando...", reply_markup=kb_opcoes(opts, len(caminho) > 0))
-
-    if message.text == "❌ Cancelar":
-        await state.clear()
-        return await message.answer("Operação cancelada.", reply_markup=kb_menu_principal())
 
     escolha = message.text.strip()
     # tenta identificar se é categoria ou produto
@@ -490,6 +494,7 @@ async def set_valor(message: types.Message, state: FSMContext):
 
     opts = list(catalogo.CATALOGO.keys())
     await message.answer(extrato)
+    # também sem botão Cancelar aqui
     return await message.answer("Deseja adicionar mais itens?", reply_markup=kb_opcoes(opts, False))
 
 
@@ -615,31 +620,6 @@ async def finalizar_do_carrinho(message: types.Message, state: FSMContext):
     await state.set_state(MainState.finalizando_mercado)
     await state.update_data(itens_detalhe=itens_detalhe, total=total)
     await message.answer(texto, parse_mode="Markdown", reply_markup=ReplyKeyboardRemove())
-
-
-@dp.message(MainState.finalizando_mercado)
-async def finalizar_mercado(message: types.Message, state: FSMContext):
-    dep_id, dep_nome, _, _ = await get_dep_data(state)
-    if not dep_id:
-        await state.clear()
-        return await message.answer("Envie /start e escolha um departamento primeiro.")
-    mercado = message.text.strip()
-    data = await state.get_data()
-    itens_detalhe = data.get("itens_detalhe", [])
-    total = data.get("total", 0)
-
-    # Guarda mercado e pede confirmação no menu de carrinho
-    await state.update_data(mercado_pendente=mercado)
-    await state.set_state(MainState.carrinho_menu)
-    await state.update_data(acao_pendente="finalizar")
-
-    texto = (
-        f"🏪 Mercado: *{mercado}*\n"
-        f"💰 Total: *R${total:.2f}*\n"
-        f"📦 {len(itens_detalhe)} itens\n\n"
-        f"Confirmar finalização?"
-    )
-    await message.answer(texto, parse_mode="Markdown", reply_markup=kb_confirmar())
 
 
 # ─── HISTÓRICO ────
