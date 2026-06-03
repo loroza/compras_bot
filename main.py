@@ -401,7 +401,7 @@ async def navegar(message: types.Message, state: FSMContext):
         caminho.pop()
         await state.update_data(caminho=caminho)
         opts = list(catalogo.CATALOGO.keys()) if not caminho else catalogo.obter_opcoes(caminho)
-        return await message.answer("Voltando...", reply_markup=kb_opcoes(opts, len(caminho) > 0, False))
+        return await message.answer("Voltando...", reply_markup=kb_opcoes(opts, True, False))
 
     escolha = message.text.strip()
     # tenta identificar se é categoria ou produto
@@ -495,7 +495,7 @@ async def set_valor(message: types.Message, state: FSMContext):
     opts = list(catalogo.CATALOGO.keys())
     await message.answer(extrato)
     # sem botão Cancelar aqui por padrão
-    return await message.answer("Deseja adicionar mais itens?", reply_markup=kb_opcoes(opts, False, False))
+    return await message.answer("Deseja adicionar mais itens?", reply_markup=kb_opcoes(opts, True, False))
 
 
 # ─── VER CARRINHO ────
