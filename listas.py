@@ -321,7 +321,7 @@ async def back_main(message: types.Message, state: FSMContext):
 async def new_list(message: types.Message, state: FSMContext):
     dep_id, _ = await get_dep_from_state(state)
     if not dep_id:
-        return await message.answer("Envie /start e escolha um departamento primeiro.")
+        return await message.answer("Envie /start e escolha o departamento primeiro.")
     # primeiro pergunta o tipo da lista (Avulsa ou Fixa)
     await state.set_state(ListaState.criando_tipo)
     await message.answer("Qual o tipo da lista?\nEscolha 'Avulsa' (lista comum) ou 'Fixa' (lista reutilizável).", reply_markup=kb_tipo_lista())
@@ -583,23 +583,50 @@ async def compra_set_valor(message: types.Message, state: FSMContext):
         if lista_id:
             itens_restantes_db = await database.pegar_itens_da_lista(lista_id)
 
+        # ---------- AQUI mostramos o extrato APÓS a adição ----------
+        extrato_texto = None
+        try:
+            if lista_id:
+                # extrato da lista (itens restantes)
+                extrato_texto = montar_extrato_texto(itens_restantes_db)
+                msg_principal = f"✅ {catalogo.formatar(produto)} adicionado ao carrinho!\n\nExtrato atualizado da lista:\n\n{extrato_texto}"
+            else:
+                # tentativa de extrato do carrinho (se função existir)
+                pegar_carrinho = getattr(database, "pegar_carrinho", None)
+                if pegar_carrinho:
+                    carrinho = await database.pegar_carrinho(message.from_user.id, dep_id)
+                    extrato_texto = montar_extrato_texto(carrinho)
+                    msg_principal = f"✅ {catalogo.formatar(produto)} adicionado ao carrinho!\n\nExtrato do carrinho:\n\n{extrato_texto}"
+                else:
+                    msg_principal = f"✅ {catalogo.formatar(produto)} adicionado ao carrinho!"
+        except Exception:
+            # fallback seguro caso algo falhe obtendo o extrato
+            msg_principal = f"✅ {catalogo.formatar(produto)} adicionado ao carrinho!"
+
         # atualiza estado
         await state.update_data(itens_pendentes=itens_pendentes)
+
         if itens_pendentes:
+            # se ainda há itens pendentes, mostra extrato + segue fluxo para próximo item
             await state.set_state(ListaState.compra_navegando)
             await state.update_data(caminho=[])
             # mostrar apenas categorias relevantes aos itens pendentes
             opts = categorias_para_itens(itens_pendentes)
-            await message.answer(f"✅ {catalogo.formatar(produto)} adicionado! Próximo item:", reply_markup=kb_opcoes(opts, True))
+            await message.answer(msg_principal, reply_markup=ReplyKeyboardRemove())
+            await message.answer("Próximo item:", reply_markup=kb_opcoes(opts, True))
         else:
             # quando todos adicionados, se a lista (no DB) está vazia -> deletar automaticamente
             if lista_id and not itens_restantes_db:
                 deleted = await database.deletar_lista(lista_id)
                 if deleted:
+                    await message.answer(msg_principal)
                     await message.answer("✅ Todos os itens comprados — a lista foi removida automaticamente.")
                 else:
+                    await message.answer(msg_principal)
                     await message.answer("✅ Compra finalizada. (Não foi possível remover automaticamente a lista.)")
             else:
+                # apenas confirmar finalização mostrando o extrato (se calculado) ou mensagem simples
+                await message.answer(msg_principal)
                 await message.answer("✅ Compra finalizada.")
             # volta para o menu de origem (provavelmente menu de compras)
             return await voltar_para_origem(message, state)
