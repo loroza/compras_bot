@@ -98,6 +98,54 @@ def encontrar_item_raw_por_label(itens: list, label: str):
     return None
 
 
+# --- HELPERS PARA FILTRAR CATEGORIAS PELO CONTEÚDO DA LISTA ---
+def _buscar_produto_recursivo(no, produto):
+    """
+    Retorna True se 'produto' existir no nó 'no' (varre recursivamente).
+    Suporta nós em formato dict com chaves comuns: 'produtos', 'subcategorias', 'grupos',
+    ou listas diretamente.
+    """
+    if isinstance(no, dict):
+        # checa lista direta de produtos no nó
+        produtos = no.get("produtos")
+        if isinstance(produtos, list) and produto in produtos:
+            return True
+        # checa sub-estruturas conhecidas
+        for chave in ("subcategorias", "grupos"):
+            sub = no.get(chave)
+            if isinstance(sub, dict):
+                for sk, sn in sub.items():
+                    if _buscar_produto_recursivo(sn, produto):
+                        return True
+        # checa quaisquer dict children
+        for k, v in no.items():
+            if k in ("produtos", "subcategorias", "grupos"):
+                continue
+            if isinstance(v, dict) and _buscar_produto_recursivo(v, produto):
+                return True
+    elif isinstance(no, list):
+        # nó é lista de produtos
+        return produto in no
+    return False
+
+
+def categorias_para_itens(itens):
+    """
+    Retorna lista ordenada de categorias de topo do CATALOGO que contêm ao menos
+    um produto presente em 'itens' (itens é uma lista de nomes).
+    Se nenhuma categoria for encontrada, retorna todas as categorias como fallback.
+    """
+    cats = set()
+    for prod in itens:
+        for cat_key, cat_node in catalogo.CATALOGO.items():
+            if _buscar_produto_recursivo(cat_node, prod):
+                cats.add(cat_key)
+                break
+    if not cats:
+        return list(catalogo.CATALOGO.keys())
+    return sorted(cats)
+
+
 async def voltar_para_origem(message: types.Message, state: FSMContext):
     """
     Retorna o usuário para o menu de onde ele veio, baseado em `menu_origin` no estado.
@@ -178,7 +226,7 @@ async def save_list(message: types.Message, state: FSMContext):
     dep_id, _ = await get_dep_from_state(state)
     if not dep_id:
         await state.clear()
-        return await message.answer("Envie /start e escolha um departamento primeiro.")
+        return await message.answer("Envie /start e escolha o departamento primeiro.")
     sucesso = await database.criar_lista(dep_id, message.text)
     await state.clear()
     if sucesso:
@@ -240,7 +288,9 @@ async def list_chosen(message: types.Message, state: FSMContext):
         return await voltar_para_origem(message, state)
     await state.set_state(ListaState.compra_navegando)
     await state.update_data(itens_pendentes=itens, caminho=[])
-    return await message.answer(f"Iniciando compra: {lista_nome}", reply_markup=kb_opcoes(list(catalogo.CATALOGO.keys()), True))
+    # mostrar apenas categorias que contêm os produtos da lista
+    categorias_filtradas = categorias_para_itens(itens)
+    return await message.answer(f"Iniciando compra: {lista_nome}", reply_markup=kb_opcoes(categorias_filtradas, True))
 
 
 @router.message(ListaState.navegando_catalogo)
@@ -361,7 +411,9 @@ async def compra_set_valor(message: types.Message, state: FSMContext):
         if itens_pendentes:
             await state.set_state(ListaState.compra_navegando)
             await state.update_data(caminho=[])
-            await message.answer(f"✅ {catalogo.formatar(produto)} adicionado! Próximo item:", reply_markup=kb_opcoes(list(catalogo.CATALOGO.keys()), True))
+            # mostrar apenas categorias relevantes aos itens pendentes
+            opts = categorias_para_itens(itens_pendentes)
+            await message.answer(f"✅ {catalogo.formatar(produto)} adicionado! Próximo item:", reply_markup=kb_opcoes(opts, True))
         else:
             # quando todos adicionados, voltar ao menu de origem (provavelmente seleção de listas)
             return await voltar_para_origem(message, state)
