@@ -89,31 +89,30 @@ def montar_extrato_texto(itens: list) -> str:
 
 
 # --- HANDLERS ---
+
+# Handler para o módulo de COMPRAS — ao clicar em "📋 Minhas Listas" partimos direto para INICIAR COMPRA
 @router.message(F.text == "📋 Minhas Listas")
-async def listas_main(message: types.Message, state: FSMContext):
-    """
-    Comportamento:
-    - se state.menu_context == "compras"  -> parte direto para escolher lista para INICIAR COMPRA
-    - caso contrário (ex.: cadastro)      -> abre gerenciador de listas (sem botão 'Iniciar Compra')
-    """
+async def listas_minhas_compras(message: types.Message, state: FSMContext):
     dep_id, _ = await get_dep_from_state(state)
     if not dep_id:
         return await message.answer("Envie /start e escolha um departamento primeiro.")
+    listas = await database.pegar_listas_disponiveis(dep_id)
+    if not listas:
+        # se não houver listas, abrimos o gerenciador (sem iniciar) para permitir criar
+        return await message.answer("Não há listas. Crie uma lista primeiro!", reply_markup=kb_listas_menu(allow_iniciar=False))
+    # colocar o estado para escolha de lista e sinalizar que a ação é iniciar compra
+    await state.set_state(ListaState.escolhendo_lista)
+    await state.update_data(acao="iniciar_compra")
+    await message.answer("Selecione a lista para iniciar a compra:", reply_markup=kb_lista_escolha(listas))
 
-    data = await state.get_data()
-    menu_context = data.get("menu_context")
 
-    # Caso: estamos no módulo de compras -> iniciar compra (pular gerenciador)
-    if menu_context == "compras":
-        listas = await database.pegar_listas_disponiveis(dep_id)
-        if not listas:
-            return await message.answer("Não há listas. Crie uma lista primeiro!", reply_markup=kb_listas_menu(allow_iniciar=False))
-        # setar ação para que o handler list_chosen entenda que é iniciar compra
-        await state.set_state(ListaState.escolhendo_lista)
-        await state.update_data(acao="iniciar_compra")
-        return await message.answer("Selecione a lista para iniciar a compra:", reply_markup=kb_lista_escolha(listas))
-
-    # Caso padrão (cadastro ou não especificado): abrir gerenciador sem a opção Iniciar Compra
+# Handler para o módulo de CADASTROS — ao clicar em "📋 Listas" abrimos o gerenciador sem botão "Iniciar Compra"
+@router.message(F.text == "📋 Listas")
+async def listas_cadastros_manager(message: types.Message, state: FSMContext):
+    dep_id, _ = await get_dep_from_state(state)
+    if not dep_id:
+        return await message.answer("Envie /start e escolha um departamento primeiro.")
+    # mostra o gerenciador de listas SEM a opção '🚀 Iniciar Compra'
     await message.answer("Gerenciar Listas:", reply_markup=kb_listas_menu(allow_iniciar=False))
 
 
@@ -190,8 +189,7 @@ async def list_chosen(message: types.Message, state: FSMContext):
         opts = list(catalogo.CATALOGO.keys())
         return await message.answer("Escolha a categoria:", reply_markup=kb_opcoes(opts, False))
 
-    # caso iniciar compra
-    # configura estado de compra a partir da lista
+    # caso iniciar compra (acao == "iniciar_compra" ou default)
     itens = await database.pegar_itens_da_lista(lista_row["id"])
     if not itens:
         await state.clear()
