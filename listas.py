@@ -322,10 +322,17 @@ async def save_list(message: types.Message, state: FSMContext):
     if not dep_id:
         await state.clear()
         return await message.answer("Envie /start e escolha o departamento primeiro.")
-    sucesso = await database.criar_lista(dep_id, message.text)
-    await state.clear()
+
+    lista_nome = message.text.strip()
+    sucesso = await database.criar_lista(dep_id, lista_nome)
+
+    # preserva o departamento no estado e retorna ao gerenciador de listas
+    await limpar_estado_preservando_departamento(state)
+    await state.set_state(ListaState.escolhendo_lista)
+    await state.update_data(menu_origin="cadastro")
+
     if sucesso:
-        await message.answer(f"✅ Lista {message.text} criada!", reply_markup=kb_listas_menu())
+        await message.answer(f"✅ Lista *{lista_nome}* criada!", parse_mode="Markdown", reply_markup=kb_listas_menu())
     else:
         await message.answer("❌ Não foi possível criar a lista (nome já existe?).", reply_markup=kb_listas_menu())
 
