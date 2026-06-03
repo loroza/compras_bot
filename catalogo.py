@@ -1,10 +1,11 @@
 import json
+from typing import Any, Dict, List, Optional, Tuple
 
-CATALOGO = {}
-ARQUIVO_ATUAL = None
+CATALOGO: Dict[str, Any] = {}
+ARQUIVO_ATUAL: Optional[str] = None
 
 
-def carregar_catalogo_dep(arquivo_json):
+def carregar_catalogo_dep(arquivo_json: Optional[str]):
     global CATALOGO, ARQUIVO_ATUAL
     ARQUIVO_ATUAL = arquivo_json
     if not arquivo_json:
@@ -18,33 +19,41 @@ def carregar_catalogo_dep(arquivo_json):
         CATALOGO = {}
 
 
-def formatar(texto):
-    return texto.replace("_", " ").title()
+def formatar(texto: str) -> str:
+    return texto.replace("_", " ").title() if texto else texto
 
 
-def obter_no(caminho):
+def obter_no(caminho: List[str]):
     no = CATALOGO
     for chave in caminho:
-        if not isinstance(no, dict):
+        if isinstance(no, dict):
+            # chave direta
+            if chave in no:
+                no = no[chave]
+                continue
+            # subcategorias / grupos
+            if "subcategorias" in no and chave in no["subcategorias"]:
+                no = no["subcategorias"][chave]
+                continue
+            if "grupos" in no and chave in no["grupos"]:
+                no = no["grupos"][chave]
+                continue
+            # não encontrou
             return None
-
-        if chave in no:
-            no = no[chave]
-        elif "subcategorias" in no and chave in no["subcategorias"]:
-            no = no["subcategorias"][chave]
-        elif "grupos" in no and chave in no["grupos"]:
-            no = no["grupos"][chave]
         else:
+            # se no não é dicionário, não há chaves subsequentes
             return None
     return no
 
 
-def obter_opcoes(caminho):
+def obter_opcoes(caminho: List[str]):
     no = obter_no(caminho)
     if no is None:
         return []
 
+    # Se é o nó raiz (dicionário de departamentos/categorias principais)
     if isinstance(no, dict):
+        # prioriza subcategorias -> grupos -> produtos -> chaves diretas
         if no is CATALOGO:
             return list(no.keys())
         if "subcategorias" in no:
@@ -52,7 +61,7 @@ def obter_opcoes(caminho):
         if "grupos" in no:
             return list(no["grupos"].keys())
         if "produtos" in no:
-            return no["produtos"]
+            return list(no["produtos"])
         return list(no.keys())
 
     if isinstance(no, list):
@@ -61,29 +70,40 @@ def obter_opcoes(caminho):
     return []
 
 
-def identificar_escolha(caminho, texto_clicado):
+def identificar_escolha(caminho: List[str], texto_clicado: str) -> Tuple[Optional[str], Optional[str]]:
     opcoes = obter_opcoes(caminho)
     texto_limpo = texto_clicado.strip().lower()
 
     for opt in opcoes:
         if isinstance(opt, str):
-            if (
-                opt.strip().lower() == texto_limpo
-                or formatar(opt).strip().lower() == texto_limpo
-                or opt.replace("_", " ").strip().lower() == texto_limpo
-            ):
+            opt_variants = {
+                opt.strip().lower(),
+                formatar(opt).strip().lower(),
+                opt.replace("_", " ").strip().lower(),
+            }
+            if texto_limpo in opt_variants:
+                # se ao avançar esse opt existe um nó -> é categoria, caso contrário, produto
                 no_teste = obter_no(caminho + [opt])
                 if no_teste is not None:
+                    # se o nó contém produtos/subcategorias -> categoria
+                    if isinstance(no_teste, dict) and any(k in no_teste for k in ("subcategorias", "grupos", "produtos")):
+                        return "categoria", opt
+                    # se for lista -> produtos
+                    if isinstance(no_teste, list):
+                        return "produto", opt
+                    # caso ambíguo, considera categoria
                     return "categoria", opt
-                return "produto", opt
+                else:
+                    # não existe nó: considera produto final
+                    return "produto", opt
 
     return None, None
 
 
-def _buscar_categoria_raiz(nome_produto):
+def _buscar_categoria_raiz(nome_produto: str) -> Optional[str]:
     nome_lower = nome_produto.strip().lower()
 
-    def buscar(no, cat_raiz):
+    def buscar(no: Any, cat_raiz: Optional[str]) -> Optional[str]:
         if isinstance(no, list):
             for p in no:
                 if isinstance(p, str) and p.strip().lower() == nome_lower:
@@ -91,21 +111,24 @@ def _buscar_categoria_raiz(nome_produto):
             return None
 
         if isinstance(no, dict):
+            # lista direta de produtos em chave 'produtos'
             if "produtos" in no:
                 for p in no["produtos"]:
                     if isinstance(p, str) and p.strip().lower() == nome_lower:
                         return cat_raiz
 
+            # busca recursiva em subcategorias e grupos
             for chave in ("subcategorias", "grupos"):
                 if chave in no:
-                    for _, sub_no in no[chave].items():
+                    for sub_nome, sub_no in no[chave].items():
                         resultado = buscar(sub_no, cat_raiz)
                         if resultado:
                             return resultado
 
+            # busca em outras chaves (caso a estrutura seja diferente)
             for chave, valor in no.items():
                 if chave not in ("subcategorias", "grupos", "produtos", "essencial"):
-                    resultado = buscar(valor, cat_raiz)
+                    resultado = buscar(valor, cat_raiz or chave)
                     if resultado:
                         return resultado
 
@@ -114,12 +137,12 @@ def _buscar_categoria_raiz(nome_produto):
     for cat_raiz, conteudo in CATALOGO.items():
         resultado = buscar(conteudo, cat_raiz)
         if resultado:
-            return cat_raiz
+            return resultado
 
     return None
 
 
-def categorias_dos_itens(itens_lista):
+def categorias_dos_itens(itens_lista: List[str]) -> List[str]:
     categorias = []
     for item in itens_lista:
         cat = _buscar_categoria_raiz(item)
