@@ -237,7 +237,7 @@ def opcoes_filtradas_para_itens(caminho, itens):
 async def voltar_para_origem(message: types.Message, state: FSMContext):
     """
     Retorna o usuário para o menu de onde ele veio, baseado em `menu_origin` no estado.
-    - 'compras' -> retorna à seleção de listas para INICIAR COMPRA (escolhendo_lista com acao=iniciar_compra)
+    - 'compras' -> retorna ao menu de compras (sai da seleção de listas)
     - 'cadastro' (padrão) -> retorna ao gerenciador de listas (kb_listas_menu)
     """
     data = await state.get_data()
@@ -245,16 +245,15 @@ async def voltar_para_origem(message: types.Message, state: FSMContext):
     dep_id, _ = await get_dep_from_state(state)
 
     if origin == "compras":
-        # voltar para seleção de listas com ação de iniciar compra
-        listas = await database.pegar_listas_disponiveis(dep_id) if dep_id else []
-        await state.set_state(ListaState.escolhendo_lista)
-        await state.update_data(acao="iniciar_compra", menu_origin="compras")
-        return await message.answer("Selecione a lista para iniciar a compra:", reply_markup=kb_lista_escolha(listas))
+        # voltar para o menu de compras (preservando departamento)
+        await limpar_estado_preservando_departamento(state)
+        return await message.answer("🛒 Menu de Compras:", reply_markup=kb_menu())
     else:
         # origem cadastro/gerenciador -> voltar ao gerenciador de listas
-        # preserva departamento
-        await limpar_estado_preservando_departamento(state)
-        return await message.answer("Gerenciar Listas:", reply_markup=kb_listas_menu(allow_iniciar=False))
+        await state.set_state(ListaState.escolhendo_lista)
+        await state.update_data(acao="iniciar_compra", menu_origin="compras")
+        listas = await database.pegar_listas_disponiveis(dep_id) if dep_id else []
+        return await message.answer("Selecione a lista para iniciar a compra:", reply_markup=kb_lista_escolha(listas))
 
 
 # --- HANDLERS ---
