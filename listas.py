@@ -9,6 +9,7 @@ router = Router()
 
 
 class ListaState(StatesGroup):
+    criando_tipo = State()
     criando_nome = State()
     escolhendo_lista = State()
     navegando_catalogo = State()
@@ -61,6 +62,16 @@ def kb_lista_escolha(listas):
     btns = [[KeyboardButton(text=l["nome"])] for l in listas]
     btns.append([KeyboardButton(text="⬅️ Voltar")])
     return ReplyKeyboardMarkup(keyboard=btns, resize_keyboard=True)
+
+
+def kb_tipo_lista():
+    return ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="Avulsa"), KeyboardButton(text="Fixa")],
+            [KeyboardButton(text="⬅️ Voltar")]
+        ],
+        resize_keyboard=True,
+    )
 
 
 # --- HELPERS (locais, sem importar main para evitar ciclos) ---
@@ -312,8 +323,27 @@ async def new_list(message: types.Message, state: FSMContext):
     dep_id, _ = await get_dep_from_state(state)
     if not dep_id:
         return await message.answer("Envie /start e escolha um departamento primeiro.")
+    # primeiro pergunta o tipo da lista (Avulsa ou Fixa) - não persistimos no DB (opção A)
+    await state.set_state(ListaState.criando_tipo)
+    await message.answer("Qual o tipo da lista?\nEscolha 'Avulsa' (lista comum) ou 'Fixa' (lista reutilizável).", reply_markup=kb_tipo_lista())
+
+
+@router.message(ListaState.criando_tipo)
+async def choose_list_type(message: types.Message, state: FSMContext):
+    if message.text == "⬅️ Voltar":
+        # volta ao gerenciador de listas
+        await state.set_state(ListaState.escolhendo_lista)
+        await state.update_data(menu_origin="cadastro")
+        return await message.answer("Gerenciar Listas:", reply_markup=kb_listas_menu(allow_iniciar=False))
+
+    text = message.text.strip().lower()
+    if text not in ("avulsa", "fixa"):
+        return await message.answer("Por favor escolha 'Avulsa' ou 'Fixa' (ou clique '⬅️ Voltar').", reply_markup=kb_tipo_lista())
+
+    lista_tipo = "avulsa" if text == "avulsa" else "fixa"
+    await state.update_data(lista_tipo=lista_tipo)
     await state.set_state(ListaState.criando_nome)
-    await message.answer("Nome da lista:", reply_markup=ReplyKeyboardRemove())
+    await message.answer("Digite o nome da lista:", reply_markup=ReplyKeyboardRemove())
 
 
 @router.message(ListaState.criando_nome)
@@ -324,6 +354,10 @@ async def save_list(message: types.Message, state: FSMContext):
         return await message.answer("Envie /start e escolha o departamento primeiro.")
 
     lista_nome = message.text.strip()
+    # obter tipo do estado (apenas para feedback; não é salvo no DB)
+    data = await state.get_data()
+    lista_tipo = data.get("lista_tipo", "avulsa")
+
     sucesso = await database.criar_lista(dep_id, lista_nome)
 
     # preserva o departamento no estado e retorna ao gerenciador de listas
@@ -332,7 +366,7 @@ async def save_list(message: types.Message, state: FSMContext):
     await state.update_data(menu_origin="cadastro")
 
     if sucesso:
-        await message.answer(f"✅ Lista *{lista_nome}* criada!", parse_mode="Markdown", reply_markup=kb_listas_menu())
+        await message.answer(f"✅ Lista *{lista_nome}* criada ({lista_tipo}).", parse_mode="Markdown", reply_markup=kb_listas_menu())
     else:
         await message.answer("❌ Não foi possível criar a lista (nome já existe?).", reply_markup=kb_listas_menu())
 
