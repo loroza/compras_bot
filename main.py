@@ -1,5 +1,6 @@
 import asyncio
 import os
+import re
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import CommandStart
 from aiogram.fsm.context import FSMContext
@@ -48,6 +49,34 @@ async def limpar_estado_preservando_departamento(state: FSMContext):
     await state.clear()
     if preserved:
         await state.set_data(preserved)
+
+
+def parse_decimal(text: str) -> float:
+    """
+    Converte strings como:
+      "5,50", "5.50", "R$ 5,50", "1.234,56", "1,234.56", "  10 "
+    em float. Lança ValueError se não conseguir.
+    """
+    if not isinstance(text, str):
+        raise ValueError("valor não é string")
+
+    s = text.strip()
+    # remove símbolos de moeda e caracteres não numéricos exceto . , -
+    s = re.sub(r"[^\d,.\-]", "", s)
+
+    if s == "" or s in (".", ",", "-", "-.", "-,"):
+        raise ValueError("string vazia depois de limpar")
+
+    # casos com ambos '.' e ',' -> assumir '.' como miles e ',' como decimal (ex: 1.234,56)
+    if s.count(".") > 0 and s.count(",") > 0:
+        s = s.replace(".", "").replace(",", ".")
+    # caso com apenas ',' -> substituir por '.'
+    elif s.count(",") > 0 and s.count(".") == 0:
+        s = s.replace(",", ".")
+    # caso com apenas '.' -> manter (ex: 1234.56)
+
+    # agora tentar converter
+    return float(s)
 
 
 # --- KEYBOARDS ---
@@ -406,33 +435,58 @@ async def set_qtd(message: types.Message, state: FSMContext):
 @dp.message(ShopState.valor)
 async def set_valor(message: types.Message, state: FSMContext):
     try:
-        valor = float(message.text.replace(",", "."))
-        data = await state.get_data()
-        produto = data.get("produto")
-        qtd = data.get("qtd")
-        dep_id, *_ = await get_dep_data(state)
-        if not dep_id:
-            return await message.answer("Envie /start e escolha um departamento primeiro.")
-
-        # Chama a função existente de adicionar ao carrinho.
-        # Ajustada para a assinatura atual do database.py: adicionar_ao_carrinho(user_id, nome, qtd, valor)
-        await database.adicionar_ao_carrinho(message.from_user.id, produto, qtd, valor)
-
-        # Recupera o carrinho (assinatura atual do database.py: pegar_carrinho())
-        itens = await database.pegar_carrinho()
-
-        # Monta o extrato formatado e envia
-        extrato = montar_extrato_carrinho(itens)
-
-        # NÃO limpar o estado: voltar para navegação para permitir adicionar mais itens
-        await state.set_state(ShopState.navegando)
-        await state.update_data(caminho=[])
-
-        opts = list(catalogo.CATALOGO.keys())
-        await message.answer(extrato)
-        return await message.answer("Deseja adicionar mais itens?", reply_markup=kb_opcoes(opts, False))
+        # tenta parsear o valor de forma tolerante
+        valor = parse_decimal(message.text)
     except Exception:
-        await message.answer("Valor inválido.")
+        return await message.answer(
+            "Valor inválido. Digite apenas o número do valor unitário.\n"
+            "Exemplos válidos: `5.50`, `5,50`, `R$ 5,50`, `1.234,56`",
+            parse_mode="Markdown"
+        )
+
+    data = await state.get_data()
+    produto = data.get("produto")
+    qtd = data.get("qtd")
+
+    if produto is None or qtd is None:
+        # algo no estado foi perdido — orientar usuário a recomeçar a compra
+        await state.clear()
+        await state.set_state(MainState.menu_principal)
+        return await message.answer(
+            "Ocorreu um problema (produto/quantidade não encontrados). "
+            "Por favor, inicie novamente: envie /start e escolha o departamento."
+        )
+
+    dep_id, *_ = await get_dep_data(state)
+    if not dep_id:
+        return await message.answer("Envie /start e escolha um departamento primeiro.")
+
+    # chamar a função do DB (assume assinatura: adicionar_ao_carrinho(user_id, nome, qtd, valor))
+    try:
+        await database.adicionar_ao_carrinho(message.from_user.id, produto, qtd, valor)
+    except Exception as e:
+        await message.answer("Erro ao salvar no carrinho. Tente novamente.")
+        print("Erro ao adicionar ao carrinho:", e)
+        return
+
+    # Recupera o carrinho (ajuste conforme sua assinatura atual do DB)
+    try:
+        itens = await database.pegar_carrinho()
+    except Exception as e:
+        await message.answer("Erro ao recuperar o carrinho. Tente novamente.")
+        print("Erro ao pegar carrinho:", e)
+        return
+
+    # Monta e envia o extrato
+    extrato = montar_extrato_carrinho(itens)
+
+    # NÃO limpar o estado: voltar para navegação para permitir adicionar mais itens
+    await state.set_state(ShopState.navegando)
+    await state.update_data(caminho=[])
+
+    opts = list(catalogo.CATALOGO.keys())
+    await message.answer(extrato)
+    return await message.answer("Deseja adicionar mais itens?", reply_markup=kb_opcoes(opts, False))
 
 
 # ─── VER CARRINHO ────
