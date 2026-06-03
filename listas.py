@@ -1,3 +1,4 @@
+# (arquivo completo: listas (17).py - substitua pelo conteúdo abaixo)
 from aiogram import Router, types, F
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
@@ -354,11 +355,12 @@ async def save_list(message: types.Message, state: FSMContext):
         return await message.answer("Envie /start e escolha o departamento primeiro.")
 
     lista_nome = message.text.strip()
-    # obter tipo do estado (apenas para feedback; não é salvo no DB)
+    # obter tipo do estado (apenas para feedback; será salvo no DB)
     data = await state.get_data()
     lista_tipo = data.get("lista_tipo", "avulsa")
 
-    sucesso = await database.criar_lista(dep_id, lista_nome)
+    # persistir com tipo no DB (criar lista com tipo)
+    sucesso = await database.criar_lista(dep_id, lista_nome, lista_tipo)
 
     # preserva o departamento no estado e retorna ao gerenciador de listas
     await limpar_estado_preservando_departamento(state)
@@ -424,8 +426,13 @@ async def list_chosen(message: types.Message, state: FSMContext):
     if not itens:
         # se lista vazia, voltar para menu de origem (preservando fluxo)
         return await voltar_para_origem(message, state)
+
+    # armazenar id/tipo da lista no estado para usar ao final da compra
+    lista_id = lista_row["id"]
+    lista_tipo = lista_row.get("tipo", "avulsa")
+
     await state.set_state(ListaState.compra_navegando)
-    await state.update_data(itens_pendentes=itens, caminho=[])
+    await state.update_data(itens_pendentes=itens, caminho=[], lista_id=lista_id, lista_tipo=lista_tipo)
     # mostrar apenas categorias que contêm os produtos da lista (top-level)
     categorias_filtradas = categorias_para_itens(itens)
     return await message.answer(f"Iniciando compra: {lista_nome}", reply_markup=kb_opcoes(categorias_filtradas, True))
@@ -575,7 +582,20 @@ async def compra_set_valor(message: types.Message, state: FSMContext):
             opts = categorias_para_itens(itens_pendentes)
             await message.answer(f"✅ {catalogo.formatar(produto)} adicionado! Próximo item:", reply_markup=kb_opcoes(opts, True))
         else:
-            # quando todos adicionados, voltar ao menu de origem (provavelmente seleção de listas)
+            # quando todos adicionados, verificar se a lista é avulsa e removê-la automaticamente
+            lista_id = data.get("lista_id")
+            lista_tipo = data.get("lista_tipo", "avulsa")
+
+            if lista_id and lista_tipo == "avulsa":
+                # tenta deletar do DB
+                deleted = await database.deletar_lista(lista_id)
+                if deleted:
+                    await message.answer("✅ Todos os itens comprados — lista avulsa removida.")
+                else:
+                    await message.answer("✅ Compra finalizada. (Não foi possível remover automaticamente a lista.)")
+            else:
+                await message.answer("✅ Compra finalizada.")
+            # volta para o menu de origem (provavelmente menu de compras)
             return await voltar_para_origem(message, state)
     except Exception:
         await message.answer("Valor inválido.")
