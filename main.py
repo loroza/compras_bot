@@ -378,7 +378,7 @@ async def start_buy(message: types.Message, state: FSMContext):
     await state.set_state(ShopState.navegando)
     await state.update_data(caminho=[])
     opts = list(catalogo.CATALOGO.keys())
-    await message.answer("Escolha a categoria:", reply_markup=kb_opcoes(opts, False))
+    await message.answer("Escolha a categoria:", reply_markup=kb_opcoes(opts, True))
 
 
 @dp.message(ShopState.navegando)
