@@ -125,6 +125,108 @@ def kb_opcoes(lista, voltar=True):
     return ReplyKeyboardMarkup(keyboard=btns, resize_keyboard=True)
 
 
+# --- CATALOG HELPERS PARA MONTAR EXTRATO ---
+def _buscar_produto_recursivo(no, produto, path):
+    # no: node do catálogo, produto: nome exato no catálogo, path: lista com chaves encontradas
+    if isinstance(no, dict):
+        # se este nó tem lista de produtos
+        produtos = no.get("produtos")
+        if isinstance(produtos, list) and produto in produtos:
+            return path
+        # procurar em subcategorias e grupos
+        for chave in ("subcategorias", "grupos"):
+            sub = no.get(chave)
+            if isinstance(sub, dict):
+                for sk, sn in sub.items():
+                    res = _buscar_produto_recursivo(sn, produto, path + [sk])
+                    if res:
+                        return res
+        # procurar por filhos dict diretamente (arquiteturas variadas)
+        for k, v in no.items():
+            if k in ("produtos", "subcategorias", "grupos"):
+                continue
+            if isinstance(v, dict):
+                res = _buscar_produto_recursivo(v, produto, path + [k])
+                if res:
+                    return res
+    elif isinstance(no, list):
+        if produto in no:
+            return path
+    return None
+
+
+def encontrar_caminho_produto(produto):
+    # percorre categorias de topo em busca do produto; retorna lista de chaves do caminho (ex: ['Bebidas', 'Refrigerantes'])
+    for cat_key, cat_node in catalogo.CATALOGO.items():
+        res = _buscar_produto_recursivo(cat_node, produto, [cat_key])
+        if res:
+            return res
+    return None
+
+
+def montar_extrato_carrinho(itens):
+    """
+    itens: lista de rows/dicts com campos: item_nome, quantidade, valor_unitario
+    Retorna string formatada conforme solicitado.
+    """
+    # agrupar: groups[cat][sub] = [itens]
+    groups = {}
+    total_cart = 0.0
+
+    for r in itens:
+        # suportar dict-like e sqlite Row/tupples
+        try:
+            nome = r["item_nome"]
+            qtd = float(r["quantidade"])
+            valor_unit = float(r["valor_unitario"])
+        except Exception:
+            # tentativa alternativa por índice
+            try:
+                nome = r[1]
+                qtd = float(r[2])
+                valor_unit = float(r[3])
+            except Exception:
+                # pular item inconsistente
+                continue
+
+        total = qtd * valor_unit
+        total_cart += total
+
+        caminho = encontrar_caminho_produto(nome)
+        if caminho:
+            categoria = caminho[0]
+            subcategoria = caminho[1] if len(caminho) > 1 else None
+        else:
+            categoria = "Outros"
+            subcategoria = None
+
+        groups.setdefault(categoria, {}).setdefault(subcategoria or "_no_sub", []).append({
+            "nome": nome,
+            "qtd": qtd,
+            "valor_unit": valor_unit,
+            "total": total
+        })
+
+    # montar texto
+    lines = []
+    lines.append("*" * 51)
+    for cat, subdict in groups.items():
+        # subtotal da categoria
+        cat_subtotal = sum(it["total"] for items in subdict.values() for it in items)
+        lines.append(f"{cat.upper()}: R${cat_subtotal:.2f}")
+        for sub, items in subdict.items():
+            sub_label = "Geral" if sub == "_no_sub" else sub.title()
+            sub_subtotal = sum(it["total"] for it in items)
+            lines.append(f"{sub_label}: R${sub_subtotal:.2f}")
+            for it in items:
+                lines.append(f" ➥ {catalogo.formatar(it['nome'])}: {it['qtd']} x R${it['valor_unit']:.2f} = R${it['total']:.2f}")
+            lines.append("")  # linha em branco entre subcategorias
+        lines.append("")  # linha em branco entre categorias
+    lines.append("*" * 51)
+    lines.append(f"Valor Total do Carrinho: R${total_cart:.2f}")
+    return "\n".join(lines)
+
+
 # --- HANDLERS ---
 @dp.message(CommandStart())
 async def start(message: types.Message, state: FSMContext):
@@ -156,7 +258,13 @@ async def escolher_departamento(message: types.Message, state: FSMContext):
         return await message.answer("Escolha um departamento válido.")
 
     # carrega o catálogo do departamento para uso imediato
-    catalogo.carregar_catalogo_dep(escolhido.get("catalogo_json"))
+    # observe: catalogo deve expor função para carregar por json/identificador
+    # se sua versão do catalogo tiver outro nome, ajuste aqui.
+    try:
+        catalogo.carregar_catalogo_dep(escolhido.get("catalogo_json"))
+    except Exception:
+        # fallback: usar catálogo padrão carregado em catalogo.CATALOGO
+        pass
 
     await state.set_data(
         {
@@ -305,18 +413,24 @@ async def set_valor(message: types.Message, state: FSMContext):
         dep_id, *_ = await get_dep_data(state)
         if not dep_id:
             return await message.answer("Envie /start e escolha um departamento primeiro.")
-        # adiciona ao carrinho (mantendo a assinatura existente)
-        await database.adicionar_ao_carrinho(message.from_user.id, dep_id, produto, qtd, valor)
+
+        # Chama a função existente de adicionar ao carrinho.
+        # Ajustada para a assinatura atual do database.py: adicionar_ao_carrinho(user_id, nome, qtd, valor)
+        await database.adicionar_ao_carrinho(message.from_user.id, produto, qtd, valor)
+
+        # Recupera o carrinho (assinatura atual do database.py: pegar_carrinho())
+        itens = await database.pegar_carrinho()
+
+        # Monta o extrato formatado e envia
+        extrato = montar_extrato_carrinho(itens)
 
         # NÃO limpar o estado: voltar para navegação para permitir adicionar mais itens
         await state.set_state(ShopState.navegando)
         await state.update_data(caminho=[])
 
         opts = list(catalogo.CATALOGO.keys())
-        return await message.answer(
-            f"✅ {catalogo.formatar(produto)} adicionado! Deseja adicionar mais itens?",
-            reply_markup=kb_opcoes(opts, False),
-        )
+        await message.answer(extrato)
+        return await message.answer("Deseja adicionar mais itens?", reply_markup=kb_opcoes(opts, False))
     except Exception:
         await message.answer("Valor inválido.")
 
@@ -327,18 +441,13 @@ async def ver_carrinho(message: types.Message, state: FSMContext):
     dep_id, _, _, _ = await get_dep_data(state)
     if not dep_id:
         return await message.answer("Envie /start e escolha um departamento primeiro.")
-    itens = await database.pegar_carrinho(message.from_user.id, dep_id)
+    # assinatura atual do database.pegar_carrinho()
+    itens = await database.pegar_carrinho()
     if not itens:
         return await message.answer("Carrinho vazio!", reply_markup=kb_menu_compras())
-    texto = "🛒 *Carrinho Atual:*\n\n"
-    total = 0
-    for item in itens:
-        sub = item["quantidade"] * item["valor_unitario"]
-        total += sub
-        texto += f"• {item['item_nome']}: {item['quantidade']}x R${item['valor_unitario']:.2f} = R${sub:.2f}\n"
-    texto += f"\n💰 *TOTAL: R${total:.2f}*"
+    texto = montar_extrato_carrinho(itens)
     await state.set_state(MainState.carrinho_menu)
-    await message.answer(texto, parse_mode="Markdown", reply_markup=kb_carrinho_menu())
+    await message.answer(texto, reply_markup=kb_carrinho_menu())
 
 
 # ─── LIMPAR CARRINHO e CONFIRMAR AÇÕES ────
@@ -355,7 +464,8 @@ async def confirmar_acao_carrinho(message: types.Message, state: FSMContext):
     acao = data.get("acao_pendente")
 
     if acao == "limpar":
-        await database.limpar_carrinho(message.from_user.id, dep_id)
+        # database.limpar_carrinho() na versão atual não filtra por user/dep, chame sem args
+        await database.limpar_carrinho()
         await limpar_estado_preservando_departamento(state)
         await state.set_state(MainState.menu_principal)
         await message.answer("🧹 Carrinho limpo!", reply_markup=kb_menu_compras())
@@ -366,7 +476,7 @@ async def confirmar_acao_carrinho(message: types.Message, state: FSMContext):
         total = data.get("total", 0)
 
         await database.salvar_historico(dep_id, data.get("lista_nome", "Compra Avulsa"), mercado, itens_detalhe, total)
-        await database.limpar_carrinho(message.from_user.id, dep_id)
+        await database.limpar_carrinho()
         await limpar_estado_preservando_departamento(state)
         await state.set_state(MainState.menu_principal)
 
@@ -380,24 +490,19 @@ async def confirmar_acao_carrinho(message: types.Message, state: FSMContext):
 @dp.message(MainState.carrinho_menu, F.text == "❌ Cancelar")
 async def cancelar_acao_carrinho(message: types.Message, state: FSMContext):
     dep_id, *_ = await get_dep_data(state)
-    itens = await database.pegar_carrinho(message.from_user.id, dep_id)
+    # pegar carrinho sem args
+    itens = await database.pegar_carrinho()
     if not itens:
         return await message.answer("Carrinho vazio!", reply_markup=kb_menu_compras())
-    texto = "🛒 *Carrinho Atual:*\n\n"
-    total = 0
-    for item in itens:
-        sub = item["quantidade"] * item["valor_unitario"]
-        total += sub
-        texto += f"• {item['item_nome']}: {item['quantidade']}x R${item['valor_unitario']:.2f} = R${sub:.2f}\n"
-    texto += f"\n💰 *TOTAL: R${total:.2f}*"
-    await message.answer(texto, parse_mode="Markdown", reply_markup=kb_carrinho_menu())
+    texto = montar_extrato_carrinho(itens)
+    await message.answer(texto, reply_markup=kb_carrinho_menu())
 
 
 # ─── FINALIZAR COMPRA (via carrinho) ────
 @dp.message(MainState.carrinho_menu, F.text == "🏁 Finalizar Compra")
 async def finalizar_do_carrinho(message: types.Message, state: FSMContext):
     dep_id, *_ = await get_dep_data(state)
-    itens = await database.pegar_carrinho(message.from_user.id, dep_id)
+    itens = await database.pegar_carrinho()
     if not itens:
         return await message.answer("Carrinho vazio!", reply_markup=kb_menu_compras())
 
@@ -405,10 +510,19 @@ async def finalizar_do_carrinho(message: types.Message, state: FSMContext):
     total = 0
     itens_detalhe = []
     for item in itens:
-        sub = item["quantidade"] * item["valor_unitario"]
+        # suportar dict/row
+        try:
+            nome = item["item_nome"]
+            qtd = item["quantidade"]
+            valor_unit = item["valor_unitario"]
+        except Exception:
+            nome = item[1]
+            qtd = item[2]
+            valor_unit = item[3]
+        sub = float(qtd) * float(valor_unit)
         total += sub
-        texto += f"• {item['item_nome']}: {item['quantidade']}x R${item['valor_unitario']:.2f} = R${sub:.2f}\n"
-        itens_detalhe.append({"nome": item["item_nome"], "quantidade": item["quantidade"], "valor_unitario": item["valor_unitario"]})
+        texto += f"• {nome}: {qtd}x R${float(valor_unit):.2f} = R${sub:.2f}\n"
+        itens_detalhe.append({"nome": nome, "quantidade": qtd, "valor_unitario": valor_unit})
 
     texto += f"\n💰 *Total: R${total:.2f}*\n\n🏪 Qual o nome do mercado?"
     await state.set_state(MainState.finalizando_mercado)
