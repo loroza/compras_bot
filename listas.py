@@ -372,6 +372,7 @@ async def remover_item_lista_handler(message: types.Message, state: FSMContext):
 
 @router.message(ListaState.removendo_item)
 async def confirmar_remover_item(message: types.Message, state: FSMContext):
+    # permitir voltar
     if message.text == "⬅️ Voltar":
         await state.clear()
         return await message.answer("Cancelado.", reply_markup=kb_listas_menu())
@@ -379,6 +380,23 @@ async def confirmar_remover_item(message: types.Message, state: FSMContext):
     data = await state.get_data()
     lista_id = data.get("lista_id")
     item = message.text.strip()
+
+    # remove o item solicitado
     await database.remover_item_lista(lista_id, item)
-    await state.clear()
-    await message.answer(f"✅ {catalogo.formatar(item)} removido da lista.", reply_markup=kb_listas_menu())
+
+    # reconsultar itens restantes na lista
+    itens_restantes = await database.pegar_itens_da_lista(lista_id)
+
+    if not itens_restantes:
+        # lista vazia - encerrar fluxo
+        await state.clear()
+        return await message.answer(f"✅ {catalogo.formatar(item)} removido. A lista está vazia.", reply_markup=kb_listas_menu())
+    else:
+        # ainda há itens — permanecer no fluxo de remoção e reexibir opções atualizadas
+        btns = [[KeyboardButton(text=catalogo.formatar(i))] for i in itens_restantes]
+        btns.append([KeyboardButton(text="⬅️ Voltar")])
+        kb = ReplyKeyboardMarkup(keyboard=btns, resize_keyboard=True)
+        # manter o estado e atualizar lista_id (já presente)
+        await state.set_state(ListaState.removendo_item)
+        await state.update_data(lista_id=lista_id)
+        return await message.answer(f"✅ {catalogo.formatar(item)} removido. Selecione outro item para remover ou volte.", reply_markup=kb)
