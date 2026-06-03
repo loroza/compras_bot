@@ -142,6 +142,107 @@ def _buscar_categoria_raiz(nome_produto: str) -> Optional[str]:
     return None
 
 
+def encontrar_caminho_produto(nome_produto: str) -> Optional[List[str]]:
+    """
+    Retorna o caminho até o produto como lista: [categoria, (subcategoria|grupo)*, produto]
+    Retorna None se não encontrado.
+    """
+    target = nome_produto.strip().lower()
+
+    def buscar(no: Any, caminho_atual: List[str]) -> Optional[List[str]]:
+        if isinstance(no, list):
+            for p in no:
+                if isinstance(p, str) and p.strip().lower() == target:
+                    return caminho_atual + [p]
+            return None
+
+        if isinstance(no, dict):
+            # se existe chave 'produtos'
+            if "produtos" in no:
+                for p in no["produtos"]:
+                    if isinstance(p, str) and p.strip().lower() == target:
+                        return caminho_atual + [p]
+            # verificar subcategorias e grupos
+            for chave in ("subcategorias", "grupos"):
+                if chave in no:
+                    for sub_nome, sub_no in no[chave].items():
+                        resultado = buscar(sub_no, caminho_atual + [sub_nome])
+                        if resultado:
+                            return resultado
+            # checar outros ramos (estruturas diferentes)
+            for chave, valor in no.items():
+                if chave not in ("subcategorias", "grupos", "produtos", "essencial"):
+                    resultado = buscar(valor, caminho_atual + [chave])
+                    if resultado:
+                        return resultado
+        return None
+
+    for cat_raiz, conteudo in CATALOGO.items():
+        res = buscar(conteudo, [cat_raiz])
+        if res:
+            return res
+    return None
+
+
+def formatar_extrato(itens_lista: List[str]) -> str:
+    """
+    Recebe lista de nomes de itens (strings) e retorna um texto agrupado por categoria/subcategoria.
+    Ordena produtos alfabeticamente.
+    """
+    if not itens_lista:
+        return "Lista vazia."
+
+    # estrutura: { categoria: { subcategoria: [produtos...] } }
+    estrutura: Dict[str, Dict[str, List[str]]] = {}
+
+    for raw in itens_lista:
+        if not raw:
+            continue
+        nome = raw.strip()
+        caminho = encontrar_caminho_produto(nome)
+        if caminho and len(caminho) >= 2:
+            categoria = formatar(caminho[0])
+            # subcategoria é o segundo elemento se existir mais de 2 (categoria + sub + ... + produto)
+            if len(caminho) >= 3:
+                subcategoria = formatar(caminho[1])
+            else:
+                # diretório categoria -> produto (sem subcategoria)
+                subcategoria = "Geral"
+            produto = formatar(caminho[-1])
+        else:
+            # produto não encontrado no catálogo
+            categoria = "Sem Categoria"
+            subcategoria = "Geral"
+            produto = formatar(nome)
+
+        estrutura.setdefault(categoria, {}).setdefault(subcategoria, []).append(produto)
+
+    # ordenar categorias, subcategorias e produtos
+    categorias_ordenadas = sorted(estrutura.keys(), key=lambda s: s.lower())
+
+    partes: List[str] = []
+    for cat in categorias_ordenadas:
+        partes.append("*" * 26)
+        partes.append(cat.upper())
+        partes.append("*" * 26)
+        partes.append("")  # linha em branco
+
+        subs = estrutura[cat]
+        subs_ordenadas = sorted(subs.keys(), key=lambda s: s.lower())
+        for sub in subs_ordenadas:
+            if sub != "Geral":
+                partes.append(f"{sub}:")
+            # lista de produtos em ordem alfabética
+            produtos = sorted(subs[sub], key=lambda s: s.lower())
+            for p in produtos:
+                partes.append(f" ➥{p}")
+            partes.append("")  # linha em branco entre subcategorias
+
+        partes.append("")  # espaço extra entre categorias
+
+    return "\n".join(partes).strip()
+
+
 def categorias_dos_itens(itens_lista: List[str]) -> List[str]:
     categorias = []
     for item in itens_lista:

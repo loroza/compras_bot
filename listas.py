@@ -73,6 +73,13 @@ async def limpar_estado_preservando_departamento(state: FSMContext):
         await state.set_data(preserved)
 
 
+def montar_extrato_texto(itens: list) -> str:
+    """
+    Wrapper para chamar a função de catalogo e garantir tamanho/markup adequado.
+    """
+    return catalogo.formatar_extrato(itens)
+
+
 # --- HANDLERS ---
 @router.message(F.text == "📋 Minhas Listas")
 async def listas_main(message: types.Message, state: FSMContext):
@@ -138,6 +145,16 @@ async def list_chosen(message: types.Message, state: FSMContext):
 
     await state.update_data(lista_nome=message.text)
     if data.get("acao") == "adicionar":
+        # mostrar extrato da lista antes de começar a adicionar
+        lista_row = await database.buscar_lista_por_nome(dep_id, message.text)
+        if not lista_row:
+            await state.clear()
+            return await message.answer("Lista não encontrada.", reply_markup=kb_listas_menu())
+
+        itens = await database.pegar_itens_da_lista(lista_row["id"])
+        extrato = montar_extrato_texto(itens)
+        await message.answer(f"Extrato atual da lista *{message.text}*:\n\n{extrato}", parse_mode="Markdown")
+        # inicia navegação no catálogo
         await state.set_state(ListaState.navegando_catalogo)
         await state.update_data(caminho=[])
         opts = list(catalogo.CATALOGO.keys())
@@ -188,7 +205,6 @@ async def nav_add(message: types.Message, state: FSMContext):
         return
 
     if tipo == "produto":
-        # adiciona item à lista selecionada
         dep_id, _ = await get_dep_from_state(state)
         lista_nome = data.get("lista_nome")
         if not lista_nome:
@@ -196,10 +212,17 @@ async def nav_add(message: types.Message, state: FSMContext):
         lista_row = await database.buscar_lista_por_nome(dep_id, lista_nome)
         if not lista_row:
             return await message.answer("Lista não encontrada no banco.")
+        # adiciona o item
         await database.adicionar_item_lista(lista_row["id"], chave)
-        await message.answer(f"✅ {catalogo.formatar(chave)} adicionado à lista!", reply_markup=kb_listas_menu())
+
+        # envia extrato atualizado
+        itens_atualizados = await database.pegar_itens_da_lista(lista_row["id"])
+        extrato = montar_extrato_texto(itens_atualizados)
+        await message.answer(f"✅ {catalogo.formatar(chave)} adicionado à lista *{lista_nome}*!\n\nExtrato atualizado:\n\n{extrato}", parse_mode="Markdown")
+
+        # volta para menu de listas (ou permite continuar adicionando; aqui vamos finalizar o fluxo)
         await state.clear()
-        return
+        return await message.answer("O que deseja fazer agora?", reply_markup=kb_listas_menu())
 
     await message.answer("Escolha inválida.")
 
