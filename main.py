@@ -1,6 +1,7 @@
 import asyncio
 import os
 import re
+import traceback
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import CommandStart
 from aiogram.fsm.context import FSMContext
@@ -203,7 +204,7 @@ def montar_extrato_carrinho(itens):
     total_cart = 0.0
 
     for r in itens:
-        # suportar dict-like e sqlite Row/tupples
+        # suportar dict-like e asyncpg.Record / rows
         try:
             nome = r["item_nome"]
             qtd = float(r["quantidade"])
@@ -260,7 +261,10 @@ def montar_extrato_carrinho(itens):
 @dp.message(CommandStart())
 async def start(message: types.Message, state: FSMContext):
     # garante que tabela/departamentos existam
-    await database.init_db()
+    try:
+        await database.init_db()
+    except Exception:
+        traceback.print_exc()
 
     deps = await database.listar_departamentos()
     if not deps:
@@ -287,12 +291,9 @@ async def escolher_departamento(message: types.Message, state: FSMContext):
         return await message.answer("Escolha um departamento válido.")
 
     # carrega o catálogo do departamento para uso imediato
-    # observe: catalogo deve expor função para carregar por json/identificador
-    # se sua versão do catalogo tiver outro nome, ajuste aqui.
     try:
         catalogo.carregar_catalogo_dep(escolhido.get("catalogo_json"))
     except Exception:
-        # fallback: usar catálogo padrão carregado em catalogo.CATALOGO
         pass
 
     await state.set_data(
@@ -424,12 +425,12 @@ async def navegar(message: types.Message, state: FSMContext):
 @dp.message(ShopState.quantidade)
 async def set_qtd(message: types.Message, state: FSMContext):
     try:
-        qtd = float(message.text.replace(",", "."))
+        qtd = parse_decimal(message.text)
         await state.update_data(qtd=qtd)
         await state.set_state(ShopState.valor)
         await message.answer("Qual o valor unitário? (Ex: 5.50)")
     except Exception:
-        await message.answer("Por favor, digite um número válido.")
+        await message.answer("Por favor, digite um número válido para a quantidade. Exemplos: 1, 2, 1.5, 1.234,56")
 
 
 @dp.message(ShopState.valor)
@@ -461,20 +462,23 @@ async def set_valor(message: types.Message, state: FSMContext):
     if not dep_id:
         return await message.answer("Envie /start e escolha um departamento primeiro.")
 
-    # chamar a função do DB (assume assinatura: adicionar_ao_carrinho(user_id, nome, qtd, valor))
+    # Debug: log antes de chamar DB
+    print(f"[DEBUG] adicionar_ao_carrinho: user={message.from_user.id} dep={dep_id} produto={produto} qtd={qtd} valor={valor}")
+
+    # chamar a função do DB com assinatura correta (user_id, dep_id, nome, qtd, valor)
     try:
-        await database.adicionar_ao_carrinho(message.from_user.id, produto, qtd, valor)
-    except Exception as e:
+        await database.adicionar_ao_carrinho(message.from_user.id, dep_id, produto, qtd, valor)
+    except Exception:
+        traceback.print_exc()
         await message.answer("Erro ao salvar no carrinho. Tente novamente.")
-        print("Erro ao adicionar ao carrinho:", e)
         return
 
-    # Recupera o carrinho (ajuste conforme sua assinatura atual do DB)
+    # Recupera o carrinho do usuário no departamento
     try:
-        itens = await database.pegar_carrinho()
-    except Exception as e:
+        itens = await database.pegar_carrinho(message.from_user.id, dep_id)
+    except Exception:
+        traceback.print_exc()
         await message.answer("Erro ao recuperar o carrinho. Tente novamente.")
-        print("Erro ao pegar carrinho:", e)
         return
 
     # Monta e envia o extrato
@@ -495,8 +499,13 @@ async def ver_carrinho(message: types.Message, state: FSMContext):
     dep_id, _, _, _ = await get_dep_data(state)
     if not dep_id:
         return await message.answer("Envie /start e escolha um departamento primeiro.")
-    # assinatura atual do database.pegar_carrinho()
-    itens = await database.pegar_carrinho()
+    # buscar carrinho do usuário no departamento
+    try:
+        itens = await database.pegar_carrinho(message.from_user.id, dep_id)
+    except Exception:
+        traceback.print_exc()
+        return await message.answer("Erro ao recuperar o carrinho. Tente novamente.")
+
     if not itens:
         return await message.answer("Carrinho vazio!", reply_markup=kb_menu_compras())
     texto = montar_extrato_carrinho(itens)
@@ -518,8 +527,15 @@ async def confirmar_acao_carrinho(message: types.Message, state: FSMContext):
     acao = data.get("acao_pendente")
 
     if acao == "limpar":
-        # database.limpar_carrinho() na versão atual não filtra por user/dep, chame sem args
-        await database.limpar_carrinho()
+        # limpar apenas o carrinho do usuário no departamento
+        try:
+            await database.limpar_carrinho(message.from_user.id, dep_id)
+        except Exception:
+            traceback.print_exc()
+            # mensagem amigável
+            await message.answer("Erro ao limpar o carrinho. Tente novamente.")
+            return
+
         await limpar_estado_preservando_departamento(state)
         await state.set_state(MainState.menu_principal)
         await message.answer("🧹 Carrinho limpo!", reply_markup=kb_menu_compras())
@@ -529,8 +545,15 @@ async def confirmar_acao_carrinho(message: types.Message, state: FSMContext):
         itens_detalhe = data.get("itens_detalhe", [])
         total = data.get("total", 0)
 
-        await database.salvar_historico(dep_id, data.get("lista_nome", "Compra Avulsa"), mercado, itens_detalhe, total)
-        await database.limpar_carrinho()
+        try:
+            await database.salvar_historico(dep_id, data.get("lista_nome", "Compra Avulsa"), mercado, itens_detalhe, total)
+            # limpar apenas carrinho do usuário no departamento
+            await database.limpar_carrinho(message.from_user.id, dep_id)
+        except Exception:
+            traceback.print_exc()
+            await message.answer("Erro ao salvar histórico. Tente novamente.")
+            return
+
         await limpar_estado_preservando_departamento(state)
         await state.set_state(MainState.menu_principal)
 
@@ -544,8 +567,13 @@ async def confirmar_acao_carrinho(message: types.Message, state: FSMContext):
 @dp.message(MainState.carrinho_menu, F.text == "❌ Cancelar")
 async def cancelar_acao_carrinho(message: types.Message, state: FSMContext):
     dep_id, *_ = await get_dep_data(state)
-    # pegar carrinho sem args
-    itens = await database.pegar_carrinho()
+    # pegar carrinho do usuário no departamento
+    try:
+        itens = await database.pegar_carrinho(message.from_user.id, dep_id)
+    except Exception:
+        traceback.print_exc()
+        return await message.answer("Erro ao recuperar o carrinho. Tente novamente.")
+
     if not itens:
         return await message.answer("Carrinho vazio!", reply_markup=kb_menu_compras())
     texto = montar_extrato_carrinho(itens)
@@ -556,7 +584,12 @@ async def cancelar_acao_carrinho(message: types.Message, state: FSMContext):
 @dp.message(MainState.carrinho_menu, F.text == "🏁 Finalizar Compra")
 async def finalizar_do_carrinho(message: types.Message, state: FSMContext):
     dep_id, *_ = await get_dep_data(state)
-    itens = await database.pegar_carrinho()
+    try:
+        itens = await database.pegar_carrinho(message.from_user.id, dep_id)
+    except Exception:
+        traceback.print_exc()
+        return await message.answer("Erro ao recuperar o carrinho. Tente novamente.")
+
     if not itens:
         return await message.answer("Carrinho vazio!", reply_markup=kb_menu_compras())
 
