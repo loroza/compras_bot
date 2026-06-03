@@ -7,6 +7,8 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 
 
 async def get_conn():
+    if not DATABASE_URL:
+        raise RuntimeError("DATABASE_URL não está definida. Configure a variável de ambiente DATABASE_URL (ex: postgres://user:pass@host:port/dbname).")
     return await asyncpg.connect(DATABASE_URL)
 
 
@@ -297,7 +299,26 @@ async def deletar_produto(prod_id):
 
 # ─── CARRINHO ────
 
-async def adicionar_ao_carrinho(user_id, dep_id, nome, qtd, valor):
+async def adicionar_ao_carrinho(user_id, dep_id, nome, qtd, valor=None):
+    """
+    Valor agora opcional (defeito temporário tratado). Se valor for None,
+    grava 0.0 e loga warning — ideal é corrigir o caller para sempre passar valor.
+    """
+    if valor is None:
+        print("[WARN] adicionar_ao_carrinho chamado sem 'valor' — atribuindo valor=0.0")
+        valor = 0.0
+
+    # garantir tipos numéricos
+    try:
+        qtd_val = float(qtd) if qtd is not None else None
+    except Exception:
+        qtd_val = None
+
+    try:
+        valor_val = float(valor) if valor is not None else None
+    except Exception:
+        valor_val = None
+
     conn = await get_conn()
     try:
         await conn.execute(
@@ -306,7 +327,7 @@ async def adicionar_ao_carrinho(user_id, dep_id, nome, qtd, valor):
             (adicionado_por, departamento_id, item_nome, quantidade, valor_unitario)
             VALUES ($1, $2, $3, $4, $5)
             """,
-            user_id, dep_id, nome, qtd, valor
+            user_id, dep_id, nome, qtd_val, valor_val
         )
     finally:
         await conn.close()
