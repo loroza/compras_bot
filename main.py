@@ -1,6 +1,7 @@
 import asyncio
 import os
 import re
+import time
 import traceback
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import CommandStart
@@ -16,6 +17,7 @@ load_dotenv()
 bot = Bot(token=os.getenv("BOT_TOKEN"))
 dp = Dispatcher()
 
+print(f"[STARTUP] main.py loaded PID={os.getpid()} ts={time.time()}")
 
 class MainState(StatesGroup):
     escolhendo_departamento = State()
@@ -266,6 +268,7 @@ def montar_extrato_carrinho(itens):
 # --- HANDLERS ---
 @dp.message(CommandStart())
 async def start(message: types.Message, state: FSMContext):
+    print(f"[DEBUG][PID {os.getpid()}][start] ts={time.time()} user={message.from_user.id}")
     # garante que tabela/departamentos existam
     try:
         await database.init_db()
@@ -284,6 +287,7 @@ async def start(message: types.Message, state: FSMContext):
 
 @dp.message(MainState.escolhendo_departamento)
 async def escolher_departamento(message: types.Message, state: FSMContext):
+    print(f"[DEBUG][PID {os.getpid()}][escolher_departamento] ts={time.time()} user={message.from_user.id}")
     deps = await database.listar_departamentos()
     escolhido = None
 
@@ -322,6 +326,7 @@ async def escolher_departamento(message: types.Message, state: FSMContext):
 # ─── MENUS ────
 @dp.message(F.text == "🛒 Compras")
 async def abrir_compras(message: types.Message, state: FSMContext):
+    print(f"[DEBUG][PID {os.getpid()}][abrir_compras] ts={time.time()} user={message.from_user.id}")
     dep_id, *_ = await get_dep_data(state)
     if not dep_id:
         return await message.answer("Envie /start e escolha um departamento primeiro.")
@@ -331,6 +336,7 @@ async def abrir_compras(message: types.Message, state: FSMContext):
 
 @dp.message(F.text == "📲 Cadastros")
 async def abrir_cadastros(message: types.Message, state: FSMContext):
+    print(f"[DEBUG][PID {os.getpid()}][abrir_cadastros] ts={time.time()} user={message.from_user.id}")
     dep_id, *_ = await get_dep_data(state)
     if not dep_id:
         return await message.answer("Envie /start e escolha um departamento primeiro.")
@@ -340,6 +346,7 @@ async def abrir_cadastros(message: types.Message, state: FSMContext):
 
 @dp.message(F.text == "⬅️ Menu Principal")
 async def voltar_menu_principal(message: types.Message, state: FSMContext):
+    print(f"[DEBUG][PID {os.getpid()}][voltar_menu_principal] ts={time.time()} user={message.from_user.id}")
     dep_id, *_ = await get_dep_data(state)
     if not dep_id:
         return await message.answer("Envie /start e escolha um departamento primeiro.")
@@ -350,6 +357,7 @@ async def voltar_menu_principal(message: types.Message, state: FSMContext):
 
 @dp.message(F.text == "⬅️ Voltar Compras")
 async def voltar_compras(message: types.Message, state: FSMContext):
+    print(f"[DEBUG][PID {os.getpid()}][voltar_compras] ts={time.time()} user={message.from_user.id}")
     dep_id, *_ = await get_dep_data(state)
     if not dep_id:
         return await message.answer("Envie /start e escolha um departamento primeiro.")
@@ -361,6 +369,7 @@ async def voltar_compras(message: types.Message, state: FSMContext):
 # ─── TROCAR DEPARTAMENTO ────
 @dp.message(F.text == "🔄 Trocar Departamento")
 async def trocar_departamento(message: types.Message, state: FSMContext):
+    print(f"[DEBUG][PID {os.getpid()}][trocar_departamento] ts={time.time()} user={message.from_user.id}")
     deps = await database.listar_departamentos()
     if not deps:
         return await message.answer("Nenhum departamento encontrado.")
@@ -378,6 +387,7 @@ class ShopState(StatesGroup):
 
 @dp.message(F.text == "🛒 Compra Avulsa")
 async def start_buy(message: types.Message, state: FSMContext):
+    print(f"[DEBUG][PID {os.getpid()}][start_buy] ts={time.time()} user={message.from_user.id}")
     dep_id, *_ = await get_dep_data(state)
     if not dep_id:
         return await message.answer("Envie /start e escolha um departamento primeiro.")
@@ -390,6 +400,7 @@ async def start_buy(message: types.Message, state: FSMContext):
 
 @dp.message(ShopState.navegando)
 async def navegar(message: types.Message, state: FSMContext):
+    print(f"[DEBUG][PID {os.getpid()}][navegar] ts={time.time()} user={message.from_user.id} text={message.text}")
     data = await state.get_data()
     caminho = data.get("caminho", [])
 
@@ -439,6 +450,7 @@ async def set_qtd(message: types.Message, state: FSMContext):
 
 @dp.message(ShopState.valor)
 async def set_valor(message: types.Message, state: FSMContext):
+    print(f"[DEBUG][PID {os.getpid()}][set_valor] ts={time.time()} user={message.from_user.id} text={message.text}")
     try:
         # tenta parsear o valor de forma tolerante
         valor = parse_decimal(message.text)
@@ -501,6 +513,7 @@ async def set_valor(message: types.Message, state: FSMContext):
 # ─── VER CARRINHO ────
 @dp.message(F.text == "📦 Ver Carrinho")
 async def ver_carrinho(message: types.Message, state: FSMContext):
+    print(f"[DEBUG][PID {os.getpid()}][ver_carrinho] ts={time.time()} user={message.from_user.id}")
     dep_id, _, _, _ = await get_dep_data(state)
     if not dep_id:
         return await message.answer("Envie /start e escolha um departamento primeiro.")
@@ -588,6 +601,7 @@ async def cancelar_acao_carrinho(message: types.Message, state: FSMContext):
 # ─── FINALIZAR COMPRA (via carrinho) ────
 @dp.message(MainState.carrinho_menu, F.text == "🏁 Finalizar Compra")
 async def finalizar_do_carrinho(message: types.Message, state: FSMContext):
+    print(f"[DEBUG][PID {os.getpid()}][finalizar_do_carrinho] ts={time.time()} user={message.from_user.id}")
     dep_id, *_ = await get_dep_data(state)
     try:
         itens = await database.pegar_carrinho(message.from_user.id, dep_id)
@@ -624,6 +638,7 @@ async def finalizar_do_carrinho(message: types.Message, state: FSMContext):
 
 @dp.message(MainState.finalizando_mercado)
 async def finalizar_mercado(message: types.Message, state: FSMContext):
+    print(f"[DEBUG][PID {os.getpid()}][finalizar_mercado] ts={time.time()} user={message.from_user.id} text={message.text}")
     dep_id, dep_nome, _, _ = await get_dep_data(state)
     if not dep_id:
         await state.clear()
@@ -650,6 +665,7 @@ async def finalizar_mercado(message: types.Message, state: FSMContext):
 # ─── HISTÓRICO ────
 @dp.message(F.text == "📜 Histórico")
 async def abrir_historico(message: types.Message, state: FSMContext):
+    print(f"[DEBUG][PID {os.getpid()}][abrir_historico] ts={time.time()} user={message.from_user.id}")
     dep_id, dep_nome, _, _ = await get_dep_data(state)
     if not dep_id:
         return await message.answer("Envie /start e escolha um departamento primeiro.")
@@ -746,8 +762,9 @@ async def main():
     from listas import router as listas_router
     dp.include_router(listas_router)
 
+    print(f"[STARTUP] entering dp.start_polling PID={os.getpid()} ts={time.time()}")
     await dp.start_polling(bot)
 
 
 if __name__ == "__main__":
-    asyncio.run(main()) 
+    asyncio.run(main())
