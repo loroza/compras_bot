@@ -426,7 +426,7 @@ async def list_chosen(message: types.Message, state: FSMContext):
     # --- a lista foi encontrada: prosseguir conforme ação ---
     acao = data.get("acao")
 
-    # FLUXO: Remover item (disparado por "🗑️ Remover Item")
+    # FLUXO: Remover item (disparado por "🗑️ Remover Item" se acionado através deste handler)
     if acao == "remover_item":
         itens = await database.pegar_itens_da_lista(lista_row["id"])
         if not itens:
@@ -628,7 +628,7 @@ async def compra_set_valor(message: types.Message, state: FSMContext):
         if lista_id:
             itens_restantes_db = await database.pegar_itens_da_lista(lista_id)
 
-        # ---------- AQUI mostramos o extrato APÓS a adição ----------
+        # ---- AQUI mostramos o extrato APÓS a adição ----
         extrato_texto = None
         try:
             if lista_id:
@@ -688,11 +688,11 @@ async def remover_item_start(message: types.Message, state: FSMContext):
     listas = await database.pegar_listas_disponiveis(dep_id)
     if not listas:
         return await message.answer("Não há listas para remover itens.", reply_markup=kb_listas_menu())
-    
-    # IMPORTANTE: Definir o estado e a ação corretamente
-    await state.set_state(ListaState.escolhendo_lista) 
-    await state.update_data(acao="remover_item", menu_origin="cadastro")
-    
+
+    # Usar o estado específico de remoção para evitar colisão com o fluxo de compra
+    await state.set_state(ListaState.escolhendo_lista_remover)
+    await state.update_data(menu_origin="cadastro", acao="remover_item")
+
     await message.answer("Selecione a lista para remover itens:", reply_markup=kb_lista_escolha(listas))
 
 
