@@ -640,7 +640,11 @@ async def remover_item_start(message: types.Message, state: FSMContext):
     if not listas:
         return await message.answer("Não há listas para remover itens.", reply_markup=kb_listas_menu())
 
-    # marca que a próxima escolha de lista inicia o fluxo de remoção via navegação por catálogo
-    await state.set_state(ListaState.escolhendo_lista_remover)
+    # usar o mesmo estado que list_chosen trata (escolhendo_lista),
+    # mas marcar a ação para indicar que é remoção
+    await state.set_state(ListaState.escolhendo_lista)
     await state.update_data(menu_origin="cadastro", acao="remover_item")
-    await message.answer("Selecione a lista para remover itens (em seguida você escolherá categoria → subcategoria → item):", reply_markup=kb_lista_escolha(listas))
+    await message.answer(
+        "Selecione a lista para remover itens (em seguida você escolherá categoria → subcategoria → item):",
+        reply_markup=kb_lista_escolha(listas),
+    )
