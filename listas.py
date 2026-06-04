@@ -397,12 +397,33 @@ async def list_chosen(message: types.Message, state: FSMContext):
         await state.clear()
         return await message.answer("Envie /start e escolha um departamento primeiro.")
 
-    lista_nome = message.text
-    lista_row = await database.buscar_lista_por_nome(dep_id, lista_nome)
-    if not lista_row:
-        await state.clear()
-        return await message.answer("Lista não encontrada.", reply_markup=kb_listas_menu())
+    lista_nome = message.text.strip()
 
+    # tentativa direta
+    lista_row = await database.buscar_lista_por_nome(dep_id, lista_nome)
+
+    # fallback resiliente: procura case-insensitive entre as listas do departamento
+    if not lista_row:
+        listas_disponiveis = await database.pegar_listas_disponiveis(dep_id)
+        text_norm = lista_nome.lower()
+        for l in listas_disponiveis:
+            if l.get("nome", "").strip().lower() == text_norm:
+                lista_row = l
+                break
+
+    # se ainda não encontrou, reexibe o teclado de listas (não limpar estado)
+    if not lista_row:
+        listas = await database.pegar_listas_disponiveis(dep_id)
+        if not listas:
+            # nenhuma lista disponível
+            return await message.answer("Lista não encontrada e não há listas disponíveis.", reply_markup=kb_listas_menu(allow_iniciar=False))
+        await state.set_state(ListaState.escolhendo_lista)
+        # preservar menu_origin atual, se existir; caso contrário usar 'cadastro'
+        menu_origin = data.get("menu_origin", "cadastro")
+        await state.update_data(menu_origin=menu_origin)
+        return await message.answer("Lista não encontrada. Selecione uma das listas abaixo:", reply_markup=kb_lista_escolha(listas))
+
+    # --- a lista foi encontrada: prosseguir conforme ação ---
     # branch por ação
     if data.get("acao") == "adicionar":
         # mostrar extrato da lista antes de iniciar a navegação no catálogo
