@@ -656,10 +656,28 @@ async def remover_item_lista_handler(message: types.Message, state: FSMContext):
     if message.text == "⬅️ Voltar":
         return await voltar_para_origem(message, state)
 
+    # tenta busca direta
     lista_row = await database.buscar_lista_por_nome(dep_id, message.text)
+
+    # tentativa resiliente: se não encontrou, tenta casar ignorando caixa/espacos
     if not lista_row:
-        await state.clear()
-        return await message.answer("Lista não encontrada.", reply_markup=kb_listas_menu())
+        listas = await database.pegar_listas_disponiveis(dep_id) if dep_id else []
+        # procura correspondência case-insensitive
+        text_norm = message.text.strip().lower()
+        for l in listas:
+            if l.get("nome", "").strip().lower() == text_norm:
+                lista_row = l
+                break
+
+    # se ainda não encontrou, reexibe o teclado de listas (não limpar estado)
+    if not lista_row:
+        listas = await database.pegar_listas_disponiveis(dep_id) if dep_id else []
+        if not listas:
+            # nenhuma lista disponível
+            return await message.answer("Lista não encontrada e não há listas disponíveis.", reply_markup=kb_listas_menu())
+        await state.set_state(ListaState.escolhendo_lista_remover)
+        await state.update_data(menu_origin="cadastro")
+        return await message.answer("Lista não encontrada. Selecione uma das listas abaixo:", reply_markup=kb_lista_escolha(listas))
 
     itens = await database.pegar_itens_da_lista(lista_row["id"])
     if not itens:
