@@ -243,7 +243,7 @@ async def listas_minhas_compras(message: types.Message, state: FSMContext):
 async def listas_cadastros_manager(message: types.Message, state: FSMContext):
     dep_id, _ = await get_dep_from_state(state)
     if not dep_id:
-        return await message.answer("Envie /start e escolha um departamento primeiro.")
+        return await message.answer("Envie /start e escolha o departamento primeiro.")
     await state.set_state(ListaState.escolhendo_lista)
     await state.update_data(menu_origin="cadastro")
     await message.answer("Gerenciar Listas:", reply_markup=kb_listas_menu(allow_iniciar=False))
@@ -308,7 +308,7 @@ async def save_list(message: types.Message, state: FSMContext):
 async def add_item_start(message: types.Message, state: FSMContext):
     dep_id, _ = await get_dep_from_state(state)
     if not dep_id:
-        return await message.answer("Envie /start e escolha um departamento primeiro.")
+        return await message.answer("Envie /start e escolha o departamento primeiro.")
     listas = await database.pegar_listas_disponiveis(dep_id)
     if not listas:
         return await message.answer("Crie uma lista primeiro!", reply_markup=kb_listas_menu())
@@ -326,7 +326,7 @@ async def list_chosen(message: types.Message, state: FSMContext):
     dep_id, _ = await get_dep_from_state(state)
     if not dep_id:
         await state.clear()
-        return await message.answer("Envie /start e escolha um departamento primeiro.")
+        return await message.answer("Envie /start e escolha o departamento primeiro.")
 
     lista_nome = message.text.strip()
     lista_row = await database.buscar_lista_por_nome(dep_id, lista_nome)
@@ -547,6 +547,7 @@ async def compra_navegar(message: types.Message, state: FSMContext):
         produto = chave
         await state.update_data(produto=produto)
         await state.set_state(ListaState.compra_quantidade)
+        await state.answer = None  # noop if message handler expects
         await message.answer(f"Quanto de {catalogo.formatar(produto)}?", reply_markup=ReplyKeyboardRemove())
         return
 
@@ -574,7 +575,7 @@ async def compra_set_valor(message: types.Message, state: FSMContext):
         dep_id, _ = await get_dep_from_state(state)
         if not dep_id:
             await state.clear()
-            return await message.answer("Envie /start e escolha o departamento primeiro.")
+            return await message.answer("Envie /start e escolha um departamento primeiro.")
         lista_id = data.get("lista_id")
 
         await database.adicionar_ao_carrinho(message.from_user.id, dep_id, produto, qtd, valor)

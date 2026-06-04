@@ -669,7 +669,7 @@ async def abrir_historico(message: types.Message, state: FSMContext):
 
     kb = ReplyKeyboardMarkup(keyboard=btns, resize_keyboard=True)
     await state.set_state(MainState.historico_menu)
-    await state.update_data(historico_compras=compras_list)
+    await state.set_data(historico_compras=compras_list)
     await message.answer(f"📜 *Histórico de compras — {dep_nome}*\nSelecione uma compra para ver os detalhes:", parse_mode="Markdown", reply_markup=kb)
 
 
