@@ -424,23 +424,47 @@ async def list_chosen(message: types.Message, state: FSMContext):
         return await message.answer("Lista não encontrada. Selecione uma das listas abaixo:", reply_markup=kb_lista_escolha(listas))
 
     # --- a lista foi encontrada: prosseguir conforme ação ---
-    # branch por ação
-    if data.get("acao") == "adicionar":
-        # mostrar extrato da lista antes de iniciar a navegação no catálogo
+    acao = data.get("acao")
+
+    # FLUXO: Remover item (disparado por "🗑️ Remover Item")
+    if acao == "remover_item":
+        itens = await database.pegar_itens_da_lista(lista_row["id"])
+        if not itens:
+            # lista vazia -> deletar automaticamente e informar, então reexibir listas
+            await database.deletar_lista(lista_row["id"])
+            listas = await database.pegar_listas_disponiveis(dep_id)
+            if not listas:
+                return await message.answer(
+                    f"A lista *{lista_row.get('nome')}* estava vazia e foi excluída automaticamente. Não há mais listas.",
+                    parse_mode="Markdown",
+                    reply_markup=kb_listas_menu(allow_iniciar=False),
+                )
+            await state.set_state(ListaState.escolhendo_lista_remover)
+            await state.update_data(menu_origin="cadastro")
+            return await message.answer("A lista estava vazia e foi excluída automaticamente. Selecione outra lista:", reply_markup=kb_lista_escolha(listas))
+
+        # construir teclado de itens para remoção
+        btns = [[KeyboardButton(text=catalogo.formatar(i))] for i in itens]
+        btns.append([KeyboardButton(text="⬅️ Voltar")])
+        kb = ReplyKeyboardMarkup(keyboard=btns, resize_keyboard=True)
+
+        await state.set_state(ListaState.removendo_item)
+        await state.update_data(lista_id=lista_row["id"], lista_nome=lista_row["nome"], departamento_id=dep_id)
+        return await message.answer(f"Lista: *{lista_row.get('nome')}*\nSelecione o item para remover:", parse_mode="Markdown", reply_markup=kb)
+
+    # FLUXO: Adicionar itens à lista (cadastro)
+    if acao == "adicionar":
         itens = await database.pegar_itens_da_lista(lista_row["id"])
         extrato = montar_extrato_texto(itens)
-        await message.answer(f"Extrato atual da lista *{lista_nome}*:\n\n{extrato}", parse_mode="Markdown")
+        await message.answer(f"Extrato atual da lista *{lista_row.get('nome')}*:\n\n{extrato}", parse_mode="Markdown")
         # inicia navegação no catálogo para adicionar itens
         await state.set_state(ListaState.navegando_catalogo)
         # preservar menu_origin existente (geralmente 'cadastro')
-        # armazena também os itens da lista (para possíveis usos futuros)
-        await state.update_data(caminho=[], lista_nome=lista_nome, lista_itens=itens, acao="adicionar")
-        # NO fluxo de CADASTRO/ADICIONAR mostramos TODAS as categorias/subcategorias
+        await state.update_data(caminho=[], lista_nome=lista_row.get("nome"), lista_itens=itens, acao="adicionar")
         opts = catalogo.obter_opcoes([])
-        # mostrar categorias com botão Voltar (sempre)
         return await message.answer("Escolha a categoria:", reply_markup=kb_opcoes(opts, True))
 
-    # caso iniciar compra
+    # FLUXO PADRÃO: iniciar compra a partir da lista
     itens = await database.pegar_itens_da_lista(lista_row["id"])
     if not itens:
         # se lista vazia, deletar automaticamente e voltar para origem
@@ -455,7 +479,7 @@ async def list_chosen(message: types.Message, state: FSMContext):
     await state.update_data(itens_pendentes=itens, caminho=[], lista_id=lista_id, lista_tipo=lista_tipo)
     # mostrar apenas categorias que contêm os produtos da lista (top-level)
     categorias_filtradas = categorias_para_itens(itens)
-    return await message.answer(f"Iniciando compra: {lista_nome}", reply_markup=kb_opcoes(categorias_filtradas, True))
+    return await message.answer(f"Iniciando compra: {lista_row.get('nome')}", reply_markup=kb_opcoes(categorias_filtradas, True))
 
 
 @router.message(ListaState.navegando_catalogo)
@@ -664,10 +688,12 @@ async def remover_item_start(message: types.Message, state: FSMContext):
     listas = await database.pegar_listas_disponiveis(dep_id)
     if not listas:
         return await message.answer("Não há listas para remover itens.", reply_markup=kb_listas_menu())
-    # marcar origem como cadastro (remoção faz parte do gerenciador)
-    await state.set_state(ListaState.escolhendo_lista_remover)
-    await state.update_data(menu_origin="cadastro")
-    await message.answer("Selecione a lista:", reply_markup=kb_lista_escolha(listas))
+    
+    # IMPORTANTE: Definir o estado e a ação corretamente
+    await state.set_state(ListaState.escolhendo_lista) 
+    await state.update_data(acao="remover_item", menu_origin="cadastro")
+    
+    await message.answer("Selecione a lista para remover itens:", reply_markup=kb_lista_escolha(listas))
 
 
 @router.message(ListaState.escolhendo_lista_remover)
