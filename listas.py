@@ -636,14 +636,27 @@ async def remover_item_start(message: types.Message, state: FSMContext):
     dep_id, _ = await get_dep_from_state(state)
     if not dep_id:
         return await message.answer("Envie /start e escolha um departamento primeiro.")
+
+    # limpa estado mantendo apenas dados do departamento para evitar restos de fluxos anteriores
+    await limpar_estado_preservando_departamento(state)
+
     listas = await database.pegar_listas_disponiveis(dep_id)
     if not listas:
         return await message.answer("Não há listas para remover itens.", reply_markup=kb_listas_menu())
+
+    # DEBUG temporário — remover depois
+    data_now = await state.get_data()
+    print(f"[DEBUG] remover_item_start invoked user={message.from_user.id} dep_id={dep_id} listas_count={len(listas)} state_after_clear={data_now}")
 
     # usar o mesmo estado que list_chosen trata (escolhendo_lista),
     # mas marcar a ação para indicar que é remoção
     await state.set_state(ListaState.escolhendo_lista)
     await state.update_data(menu_origin="cadastro", acao="remover_item")
+
+    # DEBUG: confirmar que acao foi aplicada
+    data_after = await state.get_data()
+    print(f"[DEBUG] after set_state/update_data: {data_after}")
+
     await message.answer(
         "Selecione a lista para remover itens (em seguida você escolherá categoria → subcategoria → item):",
         reply_markup=kb_lista_escolha(listas),
