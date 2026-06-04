@@ -547,7 +547,6 @@ async def compra_navegar(message: types.Message, state: FSMContext):
         produto = chave
         await state.update_data(produto=produto)
         await state.set_state(ListaState.compra_quantidade)
-        await state.answer = None  # noop if message handler expects
         await message.answer(f"Quanto de {catalogo.formatar(produto)}?", reply_markup=ReplyKeyboardRemove())
         return
 
@@ -575,7 +574,7 @@ async def compra_set_valor(message: types.Message, state: FSMContext):
         dep_id, _ = await get_dep_from_state(state)
         if not dep_id:
             await state.clear()
-            return await message.answer("Envie /start e escolha um departamento primeiro.")
+            return await message.answer("Envie /start e escolha o departamento primeiro.")
         lista_id = data.get("lista_id")
 
         await database.adicionar_ao_carrinho(message.from_user.id, dep_id, produto, qtd, valor)
