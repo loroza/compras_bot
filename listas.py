@@ -5,6 +5,36 @@ from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemo
 import catalogo
 import database
 
+import os
+import time
+import json
+
+# DEBUG: instrumentação para identificar handlers/instâncias que tratam cada mensagem
+print(f"[STARTUP] listas.py loaded PID={os.getpid()} ts={time.time():.3f}")
+
+async def _log_handler_entry(handler_name: str, message, state):
+    """
+    Chamar esta função como primeira linha de cada handler que queremos
+    instrumentar. Não altera comportamento, só imprime estado/usuario/texto.
+    """
+    try:
+        state_name = await state.get_state()
+        state_data = await state.get_data()
+    except Exception as e:
+        state_name = f"ERR:{e}"
+        state_data = {}
+    user_id = getattr(getattr(message, "from_user", None), "id", None)
+    text = getattr(message, "text", None)
+    try:
+        data_json = json.dumps(state_data, default=str, ensure_ascii=False)
+    except Exception:
+        data_json = str(state_data)
+    print(
+        f"[HANDLER] PID={os.getpid()} handler={handler_name} ts={time.time():.3f} "
+        f"user={user_id} text={text!r} state={state_name} data={data_json}"
+    )
+
+
 router = Router()
 
 
@@ -320,6 +350,8 @@ async def add_item_start(message: types.Message, state: FSMContext):
 
 @router.message(ListaState.escolhendo_lista)
 async def list_chosen(message: types.Message, state: FSMContext):
+    # DEBUG entry
+    await _log_handler_entry("list_chosen", message, state)
     # Handler dedicado para seleção de listas nos fluxos de cadastro/compras (não-remocao)
     if message.text == "⬅️ Voltar":
         return await voltar_para_origem(message, state)
@@ -380,6 +412,9 @@ async def list_chosen(message: types.Message, state: FSMContext):
 # Handler DEDICADO para seleção de lista no fluxo de REMOÇÃO
 @router.message(ListaState.escolhendo_lista_remover)
 async def list_chosen_remover(message: types.Message, state: FSMContext):
+    # DEBUG entry
+    await _log_handler_entry("list_chosen_remover", message, state)
+
     if message.text == "⬅️ Voltar":
         # voltar para menu de cadastros
         await state.set_state(ListaState.escolhendo_lista)
@@ -427,6 +462,9 @@ async def list_chosen_remover(message: types.Message, state: FSMContext):
 # NAVEGAÇÃO PARA ADICIONAR (mantive igual)
 @router.message(ListaState.navegando_catalogo)
 async def nav_add(message: types.Message, state: FSMContext):
+    # DEBUG entry
+    await _log_handler_entry("nav_add", message, state)
+
     data = await state.get_data()
     caminho = data.get("caminho", [])
     lista_itens = data.get("lista_itens", [])
@@ -490,6 +528,9 @@ async def nav_add(message: types.Message, state: FSMContext):
 # NAVEGAÇÃO PARA REMOVER: Categoria -> Subcategoria -> Item -> remover
 @router.message(ListaState.removendo_navegando)
 async def nav_remove(message: types.Message, state: FSMContext):
+    # DEBUG entry
+    await _log_handler_entry("nav_remove", message, state)
+
     data = await state.get_data()
     caminho = data.get("caminho", [])
     lista_itens = data.get("lista_itens", [])
@@ -550,6 +591,9 @@ async def nav_remove(message: types.Message, state: FSMContext):
 
 @router.message(ListaState.compra_navegando)
 async def compra_navegar(message: types.Message, state: FSMContext):
+    # DEBUG entry
+    await _log_handler_entry("compra_navegar", message, state)
+
     if message.text == "⬅️ Voltar":
         return await voltar_para_origem(message, state)
 
@@ -659,6 +703,9 @@ async def compra_set_valor(message: types.Message, state: FSMContext):
 
 @router.message(F.text == "🗑️ Remover Item")
 async def remover_item_start(message: types.Message, state: FSMContext):
+    # DEBUG entry
+    await _log_handler_entry("remover_item_start", message, state)
+
     dep_id, _ = await get_dep_from_state(state)
     if not dep_id:
         return await message.answer("Envie /start e escolha o departamento primeiro.")
