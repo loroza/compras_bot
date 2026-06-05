@@ -350,8 +350,11 @@ async def add_item_start(message: types.Message, state: FSMContext):
 
 @router.message(ListaState.escolhendo_lista)
 async def list_chosen(message: types.Message, state: FSMContext):
-    # DEBUG entry
-    await _log_handler_entry("list_chosen", message, state)
+    # Se o usuário clicou no botão "Remover Item" enquanto está no estado escolhendo_lista,
+    # delegamos para o handler que inicia o fluxo de remoção.
+    if message.text == "🗑️ Remover Item":
+        return await remover_item_start(message, state)
+
     # Handler dedicado para seleção de listas nos fluxos de cadastro/compras (não-remocao)
     if message.text == "⬅️ Voltar":
         return await voltar_para_origem(message, state)
