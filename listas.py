@@ -183,9 +183,77 @@ def _obter_no_por_caminho(caminho):
     return node
 
 
+# helper: coleta todos os produtos definidos no catálogo (chaves "raw")
+def _coletar_todos_produtos():
+    produtos = set()
+
+    def _rec(no):
+        if isinstance(no, dict):
+            p = no.get("produtos")
+            if isinstance(p, list):
+                for it in p:
+                    produtos.add(it)
+            for k, v in no.items():
+                if isinstance(v, dict):
+                    _rec(v)
+                elif isinstance(v, list):
+                    for elem in v:
+                        if isinstance(elem, dict):
+                            _rec(elem)
+        elif isinstance(no, list):
+            for elem in no:
+                if isinstance(elem, dict):
+                    _rec(elem)
+
+    _rec(catalogo.CATALOGO)
+    return produtos
+
+
 def opcoes_filtradas_para_itens(caminho, itens):
+    """
+    Retorna opções (categorias/subcategorias/produtos) filtradas
+    apenas para os produtos que estão na lista `itens`.
+
+    Esta versão aceita tanto itens no formato 'raw' quanto no formato
+    exibido (catalogo.formatar(produto)), mapeando-os para as chaves raw
+    antes de aplicar a filtragem.
+    """
+    # normaliza itens vindos do banco para chaves raw do catálogo
+    all_products = _coletar_todos_produtos()
+    # mapa label_formatada.lower() -> raw
+    formatted_map = {catalogo.formatar(p).lower(): p for p in all_products}
+
+    raw_items = set()
+    for it in itens:
+        if it in all_products:
+            raw_items.add(it)
+            continue
+        key = str(it).strip()
+        low = key.lower()
+        if low in formatted_map:
+            raw_items.add(formatted_map[low])
+            continue
+        # tentativa extra: correspondência por igualdade simples ignorando case
+        for fm_label, raw in formatted_map.items():
+            if fm_label == low:
+                raw_items.add(raw)
+                break
+
+    # se raw_items estiver vazio, manter comportamento padrão
     if not caminho:
-        return categorias_para_itens(itens)
+        # categorias que contêm algum produto da lista
+        cats = []
+        seen = set()
+        for prod in raw_items:
+            for cat_key, cat_node in catalogo.CATALOGO.items():
+                if _buscar_produto_recursivo(cat_node, prod):
+                    if cat_key not in seen:
+                        cats.append(cat_key)
+                        seen.add(cat_key)
+                    break
+        if not cats:
+            return list(catalogo.CATALOGO.keys())
+        return cats
 
     node = _obter_no_por_caminho(caminho)
     if node is None:
@@ -197,7 +265,7 @@ def opcoes_filtradas_para_itens(caminho, itens):
     produtos = node.get("produtos")
     if isinstance(produtos, list):
         for p in produtos:
-            if p in itens and p not in seen:
+            if p in raw_items and p not in seen:
                 opts.append(p)
                 seen.add(p)
 
@@ -205,7 +273,8 @@ def opcoes_filtradas_para_itens(caminho, itens):
         cont = node.get(container)
         if isinstance(cont, dict):
             for sk, sn in cont.items():
-                if any(_buscar_produto_recursivo(sn, prod) for prod in itens):
+                # se algum produto raw da lista existir recursivamente neste subnó
+                if any(_buscar_produto_recursivo(sn, prod) for prod in raw_items):
                     if sk not in seen:
                         opts.append(sk)
                         seen.add(sk)
@@ -214,7 +283,7 @@ def opcoes_filtradas_para_itens(caminho, itens):
         if k in ("produtos", "subcategorias", "grupos"):
             continue
         if isinstance(v, dict):
-            if any(_buscar_produto_recursivo(v, prod) for prod in itens):
+            if any(_buscar_produto_recursivo(v, prod) for prod in raw_items):
                 if k not in seen:
                     opts.append(k)
                     seen.add(k)
@@ -350,6 +419,9 @@ async def add_item_start(message: types.Message, state: FSMContext):
 
 @router.message(ListaState.escolhendo_lista)
 async def list_chosen(message: types.Message, state: FSMContext):
+    # DEBUG entry
+    await _log_handler_entry("list_chosen", message, state)
+
     # Se o usuário clicou no botão "Remover Item" enquanto está no estado escolhendo_lista,
     # delegamos para o handler que inicia o fluxo de remoção.
     if message.text == "🗑️ Remover Item":
