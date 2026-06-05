@@ -408,7 +408,7 @@ async def save_list(message: types.Message, state: FSMContext):
 async def add_item_start(message: types.Message, state: FSMContext):
     dep_id, _ = await get_dep_from_state(state)
     if not dep_id:
-        return await message.answer("Envie /start e escolha o departamento primeiro.")
+        return await message.answer("Envie /start e escolha um departamento primeiro.")
     listas = await database.pegar_listas_disponiveis(dep_id)
     if not listas:
         return await message.answer("Crie uma lista primeiro!", reply_markup=kb_listas_menu())
@@ -473,7 +473,24 @@ async def list_chosen(message: types.Message, state: FSMContext):
     itens = await database.pegar_itens_da_lista(lista_row["id"])
     if not itens:
         await database.deletar_lista(lista_row["id"])
-        return await message.answer("A lista estava vazia e foi excluída automaticamente.", reply_markup=kb_menu())
+
+        # reconsulta listas disponíveis e redireciona para o menu de listas (cadastro)
+        listas = await database.pegar_listas_disponiveis(dep_id)
+        if not listas:
+            # não há mais listas: limpa estado e mostra menu de listas em modo cadastro
+            await state.clear()
+            return await message.answer(
+                "A lista estava vazia e foi excluída automaticamente. Não há mais listas.",
+                reply_markup=kb_listas_menu(allow_iniciar=False),
+            )
+
+        # há outras listas: coloca usuário em escolhendo_lista para gerenciar
+        await state.set_state(ListaState.escolhendo_lista)
+        await state.update_data(menu_origin="cadastro")
+        return await message.answer(
+            "A lista estava vazia e foi excluída automaticamente. Selecione outra lista:",
+            reply_markup=kb_lista_escolha(listas),
+        )
 
     lista_id = lista_row["id"]
     lista_tipo = lista_row.get("tipo", "avulsa")
@@ -647,12 +664,37 @@ async def nav_remove(message: types.Message, state: FSMContext):
 
         if not itens_restantes:
             deleted = await database.deletar_lista(lista_id)
+
+            # reconsulta listas disponíveis
+            dep_id, _ = await get_dep_from_state(state)
+            listas = await database.pegar_listas_disponiveis(dep_id) if dep_id else []
+
             if deleted:
-                await state.clear()
-                return await message.answer(f"✅ {catalogo.formatar(produto)} removido. A lista *{lista_nome}* ficou vazia e foi excluída.", parse_mode="Markdown", reply_markup=kb_menu())
+                if not listas:
+                    # nenhuma lista restante: limpa estado e mostra menu de listas (cadastro)
+                    await state.clear()
+                    return await message.answer(
+                        f"✅ {catalogo.formatar(produto)} removido. A lista *{lista_nome}* ficou vazia e foi excluída.",
+                        parse_mode="Markdown",
+                        reply_markup=kb_listas_menu(allow_iniciar=False),
+                    )
+
+                # há outras listas: volta para escolhendo_lista no fluxo de cadastro
+                await state.set_state(ListaState.escolhendo_lista)
+                await state.update_data(menu_origin="cadastro")
+                return await message.answer(
+                    f"✅ {catalogo.formatar(produto)} removido. A lista *{lista_nome}* ficou vazia e foi excluída. Selecione outra lista:",
+                    parse_mode="Markdown",
+                    reply_markup=kb_lista_escolha(listas),
+                )
             else:
+                # falha ao deletar: limpa estado e mostre menu de listas para evitar loops
                 await state.clear()
-                return await message.answer(f"✅ {catalogo.formatar(produto)} removido. A lista ficou vazia, mas não foi possível removê-la automaticamente.", parse_mode="Markdown", reply_markup=kb_menu())
+                return await message.answer(
+                    f"✅ {catalogo.formatar(produto)} removido. A lista ficou vazia, mas não foi possível removê-la automaticamente.",
+                    parse_mode="Markdown",
+                    reply_markup=kb_listas_menu(allow_iniciar=False),
+                )
 
         # atualiza estado e permanece no fluxo de remoção para remover mais itens
         await state.update_data(lista_itens=itens_restantes)
