@@ -1,3 +1,4 @@
+# listas.py (versão atualizada)
 from aiogram import Router, types, F
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
@@ -48,6 +49,7 @@ class ListaState(StatesGroup):
     compra_quantidade = State()
     compra_valor = State()
     removendo_navegando = State()  # navegação para remover itens
+    finalizando_opcao = State()  # novo estado: escolher entre finalizar compra / finalizar lista
 
 
 # --- KEYBOARDS ---
@@ -496,7 +498,8 @@ async def list_chosen(message: types.Message, state: FSMContext):
     lista_tipo = lista_row.get("tipo", "avulsa")
 
     await state.set_state(ListaState.compra_navegando)
-    await state.update_data(itens_pendentes=itens, caminho=[], lista_id=lista_id, lista_tipo=lista_tipo)
+    # itens_pendentes armazena a cópia dos itens para esta sessão (assim, lista fixa não é alterada no DB)
+    await state.update_data(itens_pendentes=itens, caminho=[], lista_id=lista_id, lista_tipo=lista_tipo, lista_nome=lista_row.get("nome"))
     categorias_filtradas = categorias_para_itens(itens)
     return await message.answer(f"Iniciando compra: {lista_row.get('nome')}", reply_markup=kb_opcoes(categorias_filtradas, True))
 
@@ -761,27 +764,33 @@ async def compra_set_valor(message: types.Message, state: FSMContext):
         dep_id, _ = await get_dep_from_state(state)
         if not dep_id:
             await state.clear()
-            return await message.answer("Envie /start e escolha o departamento primeiro.")
+            return await message.answer("Envie /start e escolha um departamento primeiro.")
         lista_id = data.get("lista_id")
+        lista_tipo = data.get("lista_tipo", "avulsa")
 
+        # salva no carrinho (sempre)
         await database.adicionar_ao_carrinho(message.from_user.id, dep_id, produto, qtd, valor)
 
-        if lista_id:
+        # comportamento diferente para listas fixas: NÃO remover do DB
+        if lista_id and lista_tipo != "fixa":
             await database.remover_item_lista(lista_id, produto)
 
+        # remove apenas da sessão (itens_pendentes) para refletir "sair temporariamente"
         itens_pendentes = data.get("itens_pendentes", [])
         if produto in itens_pendentes:
             itens_pendentes.remove(produto)
 
-        itens_restantes_db = []
-        if lista_id:
-            itens_restantes_db = await database.pegar_itens_da_lista(lista_id)
-
+        # para montar extrato: se for fixa, usar itens_pendentes (sessão); senão, usar DB
         extrato_texto = None
         try:
             if lista_id:
-                extrato_texto = montar_extrato_texto(itens_restantes_db)
-                msg_principal = f"✅ {catalogo.formatar(produto)} adicionado ao carrinho!\n\nExtrato atualizado da lista:\n\n{extrato_texto}"
+                if lista_tipo == "fixa":
+                    extrato_texto = montar_extrato_texto(itens_pendentes)
+                    msg_principal = f"✅ {catalogo.formatar(produto)} adicionado ao carrinho!\n\nExtrato (itens restantes nesta compra):\n\n{extrato_texto}"
+                else:
+                    itens_restantes_db = await database.pegar_itens_da_lista(lista_id)
+                    extrato_texto = montar_extrato_texto(itens_restantes_db)
+                    msg_principal = f"✅ {catalogo.formatar(produto)} adicionado ao carrinho!\n\nExtrato atualizado da lista:\n\n{extrato_texto}"
             else:
                 pegar_carrinho = getattr(database, "pegar_carrinho", None)
                 if pegar_carrinho:
@@ -802,43 +811,72 @@ async def compra_set_valor(message: types.Message, state: FSMContext):
             await message.answer(msg_principal, reply_markup=ReplyKeyboardRemove())
             await message.answer("Próximo item:", reply_markup=kb_opcoes(opts, True))
         else:
-            if lista_id and not itens_restantes_db:
-                deleted = await database.deletar_lista(lista_id)
-                if deleted:
-                    await message.answer(msg_principal)
-                    await message.answer("✅ Todos os itens comprados — a lista foi removida automaticamente.")
+            # todos os itens da sessão foram processados
+            if lista_id and lista_tipo == "fixa":
+                # mostra opções finais específicas para listas fixas
+                kb_final = ReplyKeyboardMarkup(
+                    keyboard=[
+                        [KeyboardButton(text="Finalizar compra"), KeyboardButton(text="Finalizar lista")]
+                    ],
+                    resize_keyboard=True,
+                )
+                await state.set_state(ListaState.finalizando_opcao)
+                await state.update_data()  # mantém lista_id/lista_nome no estado
+                await message.answer(msg_principal)
+                await message.answer("Escolha o que deseja fazer com a lista fixa:", reply_markup=kb_final)
+                return
+            else:
+                # comportamento antigo para listas avulsas / sem lista
+                if lista_id:
+                    itens_restantes_db = await database.pegar_itens_da_lista(lista_id)
+                    if not itens_restantes_db:
+                        deleted = await database.deletar_lista(lista_id)
+                        if deleted:
+                            await message.answer(msg_principal)
+                            await message.answer("✅ Todos os itens comprados — a lista foi removida automaticamente.")
+                        else:
+                            await message.answer(msg_principal)
+                            await message.answer("✅ Compra finalizada. (Não foi possível remover automaticamente a lista.)")
+                    else:
+                        await message.answer(msg_principal)
+                        await message.answer("✅ Compra finalizada.")
                 else:
                     await message.answer(msg_principal)
-                    await message.answer("✅ Compra finalizada. (Não foi possível remover automaticamente a lista.)")
-            else:
-                await message.answer(msg_principal)
-                await message.answer("✅ Compra finalizada.")
-            return await voltar_para_origem(message, state)
+                    await message.answer("✅ Compra finalizada.")
+                return await voltar_para_origem(message, state)
     except Exception:
         await message.answer("Valor inválido.")
 
 
-@router.message(F.text == "🗑️ Remover Item")
-async def remover_item_start(message: types.Message, state: FSMContext):
-    # DEBUG entry
-    await _log_handler_entry("remover_item_start", message, state)
+# handler para as duas opções finais quando lista é fixa
+@router.message(ListaState.finalizando_opcao)
+async def finalizar_opcao(message: types.Message, state: FSMContext):
+    text = message.text.strip()
+    data = await state.get_data()
+    lista_id = data.get("lista_id")
+    lista_nome = data.get("lista_nome")
 
-    dep_id, _ = await get_dep_from_state(state)
-    if not dep_id:
-        return await message.answer("Envie /start e escolha o departamento primeiro.")
+    if text == "Finalizar compra":
+        # finaliza a sessão/compra, mantém a lista fixa no DB
+        await message.answer("✅ Compra finalizada — a lista fixa foi preservada.", reply_markup=kb_menu())
+        await limpar_estado_preservando_departamento(state)
+        return
 
-    # limpa estado mantendo apenas dados do departamento para evitar restos de fluxos anteriores
-    await limpar_estado_preservando_departamento(state)
+    if text == "Finalizar lista":
+        if lista_id:
+            try:
+                deleted = await database.deletar_lista(lista_id)
+            except Exception:
+                deleted = False
+            if deleted:
+                await message.answer(f"✅ Lista *{lista_nome}* finalizada e removida.", parse_mode="Markdown", reply_markup=kb_menu())
+            else:
+                await message.answer("✅ Compra finalizada. Não foi possível remover a lista automaticamente.", reply_markup=kb_menu())
+        else:
+            await message.answer("Lista não encontrada para remoção.", reply_markup=kb_menu())
 
-    listas = await database.pegar_listas_disponiveis(dep_id)
-    if not listas:
-        return await message.answer("Não há listas para remover itens.", reply_markup=kb_listas_menu())
+        await limpar_estado_preservando_departamento(state)
+        return
 
-    # setar estado dedicado para seleção de lista a ser removida
-    await state.set_state(ListaState.escolhendo_lista_remover)
-    await state.update_data(menu_origin="cadastro")
-
-    await message.answer(
-        "Selecione a lista para remover itens (em seguida você escolherá categoria → subcategoria → item):",
-        reply_markup=kb_lista_escolha(listas),
-    )
+    # opção inválida
+    return await message.answer("Opção inválida. Escolha 'Finalizar compra' ou 'Finalizar lista'.")
