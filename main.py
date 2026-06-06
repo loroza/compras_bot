@@ -344,17 +344,6 @@ async def abrir_cadastros(message: types.Message, state: FSMContext):
     await message.answer("📲 Menu de Cadastros:", reply_markup=kb_menu_cadastros())
 
 
-@dp.message(F.text == "⬅️ Menu Principal")
-async def voltar_menu_principal(message: types.Message, state: FSMContext):
-    print(f"[DEBUG][PID {os.getpid()}][voltar_menu_principal] ts={time.time()} user={message.from_user.id}")
-    dep_id, *_ = await get_dep_data(state)
-    if not dep_id:
-        return await message.answer("Envie /start e escolha um departamento primeiro.")
-    await limpar_estado_preservando_departamento(state)
-    await state.set_state(MainState.menu_principal)
-    await message.answer("Menu principal:", reply_markup=kb_menu_principal())
-
-
 @dp.message(F.text == "⬅️ Voltar Compras")
 async def voltar_compras(message: types.Message, state: FSMContext):
     print(f"[DEBUG][PID {os.getpid()}][voltar_compras] ts={time.time()} user={message.from_user.id}")
@@ -685,7 +674,8 @@ async def abrir_historico(message: types.Message, state: FSMContext):
 
     kb = ReplyKeyboardMarkup(keyboard=btns, resize_keyboard=True)
     await state.set_state(MainState.historico_menu)
-    await state.set_data(historico_compras=compras_list)
+    # CORREÇÃO: passar dict para set_data (aiogram v3)
+    await state.set_data({"historico_compras": compras_list})
     await message.answer(f"📜 *Histórico de compras — {dep_nome}*\nSelecione uma compra para ver os detalhes:", parse_mode="Markdown", reply_markup=kb)
 
 
@@ -756,15 +746,57 @@ async def historico_detalhe_nav(message: types.Message, state: FSMContext):
         return await message.answer("Menu principal:", reply_markup=kb_menu_principal())
 
 
+# Centralizado: trata "⬅️ Menu Principal" apenas nos states onde isso realmente
+# deve voltar ao menu principal, evitando interceptar botões de navegação interna.
+@dp.message(
+    MainState.menu_principal,
+    MainState.carrinho_menu,
+    MainState.historico_menu,
+    MainState.historico_detalhe,
+    F.text == "⬅️ Menu Principal",
+)
+async def voltar_menu_principal(message: types.Message, state: FSMContext):
+    print(f"[DEBUG][PID {os.getpid()}][voltar_menu_principal] ts={time.time()} user={message.from_user.id}")
+    dep_id, *_ = await get_dep_data(state)
+    if not dep_id:
+        # sem departamento escolhido — reiniciar fluxo
+        await state.clear()
+        await state.set_state(MainState.escolhendo_departamento)
+        deps = await database.listar_departamentos()
+        return await message.answer("🏬 Escolha o departamento:", reply_markup=kb_departamentos(deps))
+
+    # preservar departamento e voltar ao menu principal
+    await limpar_estado_preservando_departamento(state)
+    await state.set_state(MainState.menu_principal)
+    await message.answer("Menu principal:", reply_markup=kb_menu_principal())
+
+
 # ─── CHAMA ROTERS EXTERNOS (listas) E START ────
 async def main():
     # inclui router de listas (import dentro da função para evitar ciclos)
     from listas import router as listas_router
     dp.include_router(listas_router)
 
+    # tenta incluir router de orçamentos se o módulo existir
+    try:
+        from orcamentos import router as orc_router
+        dp.include_router(orc_router)
+    except Exception as e:
+        print(f"[WARN] não foi possível incluir orcamentos router: {e}")
+
     print(f"[STARTUP] entering dp.start_polling PID={os.getpid()} ts={time.time()}")
     await dp.start_polling(bot)
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("Interrupted by user")
+    except Exception:
+        traceback.print_exc()
+        # tenta fechar sessão do bot de forma graciosa
+        try:
+            asyncio.run(bot.session.close())
+        except Exception:
+            pass
