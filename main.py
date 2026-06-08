@@ -711,7 +711,7 @@ async def selecionar_historico(message: types.Message, state: FSMContext):
     )
     for item in itens:
         sub = item["quantidade"] * item["valor_unitario"]
-        texto += f"• {item['item_nome']}: {item['quantidade']}x R${item['valor_unitario']:.2f} = R${sub:.2f}\n"
+        texto += f"• {item['item_nome']}: {item['quantidade']:.3f}x R${item['valor_unitario']:.2f} = R${sub:.2f}\n"
 
     kb_voltar = ReplyKeyboardMarkup(
         keyboard=[[KeyboardButton(text="⬅️ Voltar Histórico")], [KeyboardButton(text="⬅️ Menu Principal")]],
