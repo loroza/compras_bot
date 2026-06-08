@@ -1,3 +1,4 @@
+# main.py
 import asyncio
 import os
 import re
@@ -95,7 +96,8 @@ def kb_menu_principal():
     return ReplyKeyboardMarkup(
         keyboard=[
             [KeyboardButton(text="🛒 Compras"), KeyboardButton(text="📲 Cadastros")],
-            [KeyboardButton(text="📜 Histórico"), KeyboardButton(text="🔄 Trocar Departamento")],
+            [KeyboardButton(text="📜 Histórico"), KeyboardButton(text="📊 Orçamentos")],
+            [KeyboardButton(text="🔄 Trocar Departamento")],
         ],
         resize_keyboard=True,
     )
@@ -257,7 +259,7 @@ def montar_extrato_carrinho(itens):
             sub_subtotal = sum(it["total"] for it in items)
             lines.append(f"{sub_label}: R${sub_subtotal:.2f}")
             for it in items:
-                lines.append(f" ➥ {catalogo.formatar(it['nome'])}: {it['qtd']} x R${it['valor_unit']:.2f} = R${it['total']:.2f}")
+                lines.append(f" ➥ {catalogo.formatar(it['nome'])}: {it['qtd']:.3f} x R${it['valor_unit']:.2f} = R${it['total']:.2f}")
             lines.append("")  # linha em branco entre subcategorias
         lines.append("")  # linha em branco entre categorias
     lines.append("*" * 51)
@@ -674,18 +676,13 @@ async def abrir_historico(message: types.Message, state: FSMContext):
 
     kb = ReplyKeyboardMarkup(keyboard=btns, resize_keyboard=True)
     await state.set_state(MainState.historico_menu)
-    # CORREÇÃO: passar dict para set_data (aiogram v3)
     await state.set_data({"historico_compras": compras_list})
     await message.answer(f"📜 *Histórico de compras — {dep_nome}*\nSelecione uma compra para ver os detalhes:", parse_mode="Markdown", reply_markup=kb)
 
 
 @dp.message(MainState.historico_menu)
 async def selecionar_historico(message: types.Message, state: FSMContext):
-    if message.text == "⬅️ Menu Principal":
-        await limpar_estado_preservando_departamento(state)
-        await state.set_state(MainState.menu_principal)
-        return await message.answer("Menu principal:", reply_markup=kb_menu_principal())
-
+    # NOTE: "⬅️ Menu Principal" é tratado pelo handler centralizado (ver abaixo).
     data = await state.get_data()
     compras = data.get("historico_compras", [])
     compra_selecionada = None
@@ -740,10 +737,7 @@ async def historico_detalhe_nav(message: types.Message, state: FSMContext):
         await state.update_data(historico_compras=[dict(c) for c in compras])
         return await message.answer("📜 Selecione uma compra:", reply_markup=kb)
 
-    if message.text == "⬅️ Menu Principal":
-        await limpar_estado_preservando_departamento(state)
-        await state.set_state(MainState.menu_principal)
-        return await message.answer("Menu principal:", reply_markup=kb_menu_principal())
+    # NOTE: "⬅️ Menu Principal" é tratado pelo handler centralizado (ver abaixo).
 
 
 # Centralizado: trata "⬅️ Menu Principal" apenas nos states onde isso realmente

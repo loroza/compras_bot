@@ -1,4 +1,4 @@
-# listas.py (versão corrigida)
+# listas.py (versão ajustada para exibir extrato do carrinho quando necessário)
 from aiogram import Router, types, F
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
@@ -127,6 +127,35 @@ def encontrar_item_raw_por_label(itens: list, label: str):
     return None
 
 
+# --- HELPERS LOCAIS: montar extrato do carrinho (similar ao main.montar_extrato_carrinho)
+def montar_extrato_carrinho_local(itens):
+    if not itens:
+        return "Carrinho vazio."
+    lines = []
+    total = 0.0
+    # agrupa por item_name
+    agg = {}
+    for r in itens:
+        try:
+            nome = r["item_nome"]
+            qtd = float(r["quantidade"] or 0)
+            valor = float(r["valor_unitario"] or 0)
+        except Exception:
+            nome = r[1]
+            qtd = float(r[2] or 0)
+            valor = float(r[3] or 0)
+        if nome in agg:
+            agg[nome]["qtd"] += qtd
+        else:
+            agg[nome] = {"qtd": qtd, "valor": valor}
+    for nome, v in agg.items():
+        subtotal = v["qtd"] * v["valor"]
+        total += subtotal
+        lines.append(f"• {catalogo.formatar(nome)}: {v['qtd']:.3f}x R${v['valor']:.2f} = R${subtotal:.2f}")
+    lines.append(f"\nValor Total do Carrinho: R${total:.2f}")
+    return "\n".join(lines)
+
+
 # --- CATALOG NAV HELPERS ---
 def _buscar_produto_recursivo(no, produto):
     if isinstance(no, dict):
@@ -248,7 +277,7 @@ def opcoes_filtradas_para_itens(caminho, itens):
                     if cat_key not in seen:
                         cats.append(cat_key)
                         seen.add(cat_key)
-                    break
+                        break
         if not cats:
             return list(catalogo.CATALOGO.keys())
         return cats
@@ -362,8 +391,19 @@ async def listas_cadastros_manager(message: types.Message, state: FSMContext):
 
 @router.message(F.text == "⬅️ Menu Principal")
 async def back_main(message: types.Message, state: FSMContext):
+    """
+    Volta explicitamente para o menu principal (mostrando o mesmo teclado do main.py),
+    preservando o departamento.
+    """
     await limpar_estado_preservando_departamento(state)
-    await message.answer("Menu Principal:", reply_markup=kb_menu())
+    kb = ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="🛒 Compras"), KeyboardButton(text="📲 Cadastros")],
+            [KeyboardButton(text="📜 Histórico"), KeyboardButton(text="🔄 Trocar Departamento")],
+        ],
+        resize_keyboard=True,
+    )
+    await message.answer("Menu principal:", reply_markup=kb)
 
 
 @router.message(F.text == "➕ Nova Lista")
@@ -419,7 +459,7 @@ async def save_list(message: types.Message, state: FSMContext):
 async def add_item_start(message: types.Message, state: FSMContext):
     dep_id, _ = await get_dep_from_state(state)
     if not dep_id:
-        return await message.answer("Envie /start e escolha um departamento primeiro.")
+        return await message.answer("Envie /start e escolha o departamento primeiro.")
     listas = await database.pegar_listas_disponiveis(dep_id)
     if not listas:
         return await message.answer("Crie uma lista primeiro!", reply_markup=kb_listas_menu())
@@ -793,7 +833,15 @@ async def compra_set_valor(message: types.Message, state: FSMContext):
     if produto in itens_pendentes:
         itens_pendentes.remove(produto)
 
-    # para montar extrato: se for fixa, usar itens_pendentes (sessão); senão, usar DB
+    # Monta mensagem principal (sucesso) e também inclui o extrato do CARRINHO (melhora UX)
+    try:
+        # tenta montar extrato do carrinho atual para exibir ao usuário
+        carrinho = await database.pegar_carrinho(message.from_user.id, dep_id)
+        extrato_carrinho = montar_extrato_carrinho_local(carrinho)
+    except Exception:
+        extrato_carrinho = None
+
+    # Mensagem de confirmação específica (mantive lógica existente para listas)
     try:
         if lista_id:
             if lista_tipo == "fixa":
@@ -804,15 +852,14 @@ async def compra_set_valor(message: types.Message, state: FSMContext):
                 extrato_texto = montar_extrato_texto(itens_restantes_db)
                 msg_principal = f"✅ {catalogo.formatar(produto)} adicionado ao carrinho!\n\nExtrato atualizado da lista:\n\n{extrato_texto}"
         else:
-            pegar_carrinho = getattr(database, "pegar_carrinho", None)
-            if pegar_carrinho:
-                carrinho = await database.pegar_carrinho(message.from_user.id, dep_id)
-                extrato_texto = montar_extrato_texto(carrinho)
-                msg_principal = f"✅ {catalogo.formatar(produto)} adicionado ao carrinho!\n\nExtrato do carrinho:\n\n{extrato_texto}"
+            # sem lista: mostra extrato do carrinho
+            if extrato_carrinho:
+                msg_principal = f"✅ {catalogo.formatar(produto)} adicionado ao carrinho!\n\nExtrato do carrinho:\n\n{extrato_carrinho}"
             else:
                 msg_principal = f"✅ {catalogo.formatar(produto)} adicionado ao carrinho!"
     except Exception:
         msg_principal = f"✅ {catalogo.formatar(produto)} adicionado ao carrinho!"
+        extrato_carrinho = None
 
     await state.update_data(itens_pendentes=itens_pendentes)
 
@@ -820,6 +867,7 @@ async def compra_set_valor(message: types.Message, state: FSMContext):
         await state.set_state(ListaState.compra_navegando)
         await state.update_data(caminho=[])
         opts = categorias_para_itens(itens_pendentes)
+        # envia confirmação e pergunta do próximo item
         await message.answer(msg_principal, reply_markup=ReplyKeyboardRemove())
         await message.answer("Próximo item:", reply_markup=kb_opcoes(opts, True))
     else:
