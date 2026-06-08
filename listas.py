@@ -13,6 +13,7 @@ import json
 # DEBUG: instrumentação para identificar handlers/instâncias que tratam cada mensagem
 print(f"[STARTUP] listas.py loaded PID={os.getpid()} ts={time.time():.3f}")
 
+
 async def _log_handler_entry(handler_name: str, message, state):
     """
     Chamar esta função como primeira linha de cada handler que queremos
@@ -277,7 +278,7 @@ def opcoes_filtradas_para_itens(caminho, itens):
                     if cat_key not in seen:
                         cats.append(cat_key)
                         seen.add(cat_key)
-                        break
+                    break
         if not cats:
             return list(catalogo.CATALOGO.keys())
         return cats
@@ -383,7 +384,7 @@ async def listas_minhas_compras(message: types.Message, state: FSMContext):
 async def listas_cadastros_manager(message: types.Message, state: FSMContext):
     dep_id, _ = await get_dep_from_state(state)
     if not dep_id:
-        return await message.answer("Envie /start e escolha o departamento primeiro.")
+        return await message.answer("Envie /start e escolha um departamento primeiro.")
     await state.set_state(ListaState.escolhendo_lista)
     await state.update_data(menu_origin="cadastro")
     await message.answer("Gerenciar Listas:", reply_markup=kb_listas_menu(allow_iniciar=False))
@@ -831,7 +832,10 @@ async def compra_set_valor(message: types.Message, state: FSMContext):
     # remove apenas da sessão (itens_pendentes) para refletir "sair temporariamente"
     itens_pendentes = data.get("itens_pendentes", [])
     if produto in itens_pendentes:
-        itens_pendentes.remove(produto)
+        try:
+            itens_pendentes.remove(produto)
+        except ValueError:
+            pass
 
     # Monta mensagem principal (sucesso) e também inclui o extrato do CARRINHO (melhora UX)
     try:

@@ -18,7 +18,8 @@ load_dotenv()
 bot = Bot(token=os.getenv("BOT_TOKEN"))
 dp = Dispatcher()
 
-print(f"[STARTUP] main.py loaded PID={os.getpid()} ts={time.time()}")
+print(f"[STARTUP] main.py loaded PID={os.getpid()} ts={time.time():.3f}")
+
 
 class MainState(StatesGroup):
     escolhendo_departamento = State()
