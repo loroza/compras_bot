@@ -1,6 +1,6 @@
 {
   "masculino": {
-    "subcategoria": {
+    "subcategorias": {
       "camisa": {
         "essencial": false,
         "produtos": [
