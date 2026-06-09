@@ -1,6 +1,6 @@
 {
   "masculino": {
-    "subcategorias": {
+    "subcategoriass": {
       "camisa": {
         "essencial": false,
         "produtos": [
@@ -154,7 +154,7 @@
     }
   },
   "feminino": {
-    "subcategoria": {
+    "subcategorias": {
       "blusa": {
         "essencial": false,
         "produtos": [
@@ -325,7 +325,7 @@
     }
   },
   "infantil": {
-    "subcategoria": {
+    "subcategorias": {
       "bebe": {
         "essencial": true,
         "produtos": [
@@ -408,7 +408,7 @@
     }
   },
   "calcados": {
-    "subcategoria": {
+    "subcategorias": {
       "tenis": {
         "essencial": false,
         "produtos": [
@@ -460,7 +460,7 @@
     }
   },
   "acessorios": {
-    "subcategoria": {
+    "subcategorias": {
       "bolsas_e_mochilas": {
         "essencial": false,
         "produtos": [
@@ -506,7 +506,7 @@
     }
   },
   "esportes_e_atividade_fisica": {
-    "subcategoria": {
+    "subcategorias": {
       "fitness": {
         "essencial": false,
         "produtos": [
