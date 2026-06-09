@@ -1,167 +1,95 @@
 {
   "cozinha": {
     "subcategorias": {
-      "eletrodomesticos_grandes": {
+      "eletrodomesticos_de_cozinha": {
         "essencial": true,
         "produtos": [
-          "geladeira frost-free",
-          "freezer vertical",
-          "forno embutido",
+          "geladeira",
+          "freezer",
+          "forno elétrico",
           "cooktop 4 bocas",
+          "cooktop 5 bocas",
           "lava-louças",
-          "coifa de parede"
+          "coifa de parede",
+          "coifa de ilha",
+          "forno micro-ondas",
+          "fogão 4 bocas",
+          "fogão 5 bocas"
         ]
       },
-      "mobiliario_planejado": {
+      "mobilia_de_cozinha": {
         "produtos": [
-          "armario de cozinha planejado",
+          "armario de cozinha",
           "paneleiro embutido",
           "balcao/ilha de cozinha",
           "gabinete para pia inox"
-        ]
-      },
-      "instalacao_hidraulica": {
-        "produtos": [
-          "misturador monocomando cozinha",
-          "registro de gaveta",
-          "sifao inox 3/4",
-          "tubulação PPR/PEX e conexões"
-        ]
-      },
-      "bancadas_e_pias": {
-        "produtos": [
-          "bancada em granito/silestone",
-          "pia inox 1 cuba/2 cubas",
-          "torneira com filtro embutido"
-        ]
-      },
-      "acessorios_fixacao_e_instalacao": {
-        "produtos": [
-          "suportes metálicos para armário pesado",
-          "buchas e parafusos de expansão",
-          "kit instalação de forno embutido"
         ]
       }
     }
   },
   "sala": {
     "subcategorias": {
-      "mobiliario": {
+      "mobilia_da_sala": {
         "produtos": [
-          "sofa 2/3 lugares",
+          "sofa 2 lugares",
+          "sofa 3 lugares",
+          "sofa cama",
           "rack para TV",
           "estante modular",
           "mesa de centro"
         ]
       },
-      "audio_video": {
+      "eletrodomesticos_da_sala": {
         "produtos": [
-          "televisor 4K",
+          "smart TV",
           "soundbar / home theater",
           "projetor + tela retrátil",
-          "suporte articulado para TV"
-        ]
-      },
-      "iluminacao_e_ambiente": {
-        "produtos": [
-          "lustre/pendente decorativo",
-          "plafon embutir LED",
-          "dimmer para iluminação",
-          "luminária de piso"
-        ]
-      },
-      "piso_e_acabamento": {
-        "produtos": [
-          "rodapé MDF/porcelanato",
-          "assoalho vinílico laminado",
-          "tapete sob medida"
+          "suporte articulado para TV",
+          "ventilador de mesa"
         ]
       }
     }
   },
   "quartos": {
     "subcategorias": {
-      "mobiliario_e_roupa_de_cama": {
+      "mobilia_do_quarto": {
         "essencial": true,
         "produtos": [
-          "cama box casal/solteiro",
-          "colchão espuma/mola/viscoelástico",
+          "cama box casal",
+          "cama box solteiro",
+          "colchão casal",
+          "colchão solteiro",
           "guarda-roupa modulado",
-          "cômoda com gavetas"
+          "cômoda com gavetas",
+          "penteadeira com espelho",
+          "criado-mudo",
+          "cortina blackout"
         ]
       },
-      "armarios_embutidos": {
+      "eletrodomesticos_do_quarto": {
         "produtos": [
-          "painel porta correr",
-          "prateleiras e cabideiros moduláveis",
-          "organizador de closet"
-        ]
-      },
-      "controle_ambiente": {
-        "produtos": [
-          "ar-condicionado split inverter",
-          "persiana rolô blackout",
-          "ventilador de teto"
-        ]
-      }
-    }
-  },
-  "banheiros": {
-    "subcategorias": {
-      "loucas_e_pecas": {
-        "essencial": true,
-        "produtos": [
-          "vaso sanitário com caixa acoplada",
-          "lavatório com bancada",
-          "box de vidro temperado",
-          "cuba sobrepor"
-        ]
-      },
-      "hidraulica_banheiro": {
-        "produtos": [
-          "misturador monocomando banho",
-          "registro angular",
-          "válvula de descarga dual-flush",
-          "sifão e conexões para esgoto"
-        ]
-      },
-      "aquecimento": {
-        "produtos": [
-          "aquecedor de passagem (gás)",
-          "aquecedor elétrico de passagem",
-          "resistência para aquecedor"
-        ]
-      },
-      "acessorios_fixacao": {
-        "produtos": [
-          "suportes para box",
-          "kit instalação de cuba",
-          "vedantes e silicone sanitário"
+          "ar-condicionado split",
+          "ventilador de teto",
+          "luminária de cabeceira"          
         ]
       }
     }
   },
   "lavanderia": {
     "subcategorias": {
-      "eletrodomesticos": {
+      "eletrodomesticos_da_lavanderia": {
         "produtos": [
           "máquina de lavar roupa (carga frontal/vertical)",
           "secadora de roupas",
-          "tanque de inox/cerâmica",
-          "armário para produtos e acessórios"
+          "tanquinho de lavar"
         ]
       },
       "drenagem_e_instalacao": {
         "produtos": [
           "bomba de drenagem/condensado",
           "tubulação corrugada para escoamento",
-          "suportes antivibração para máquina"
-        ]
-      },
-      "servicos_instalacao": {
-        "produtos": [
-          "instalação hidráulica de lavanderia (profissional)",
-          "instalação elétrica dedicada (tomada 20A)"
+          "suportes antivibração para máquina",
+          "armário para produtos e acessórios"
         ]
       }
     }
@@ -188,7 +116,72 @@
           "compressor de ar portátil",
           "macaco hidráulico 2-3t",
           "conjunto de soquetes e chaves",
-          "carrinho para ferramentas"
+          "carrinho para ferramentas",
+          "macaco de assoalho 2-3t",
+          "cavaletes de apoio (pares)",
+          "calços para rodas",
+          "chave de torque (torquímetro)",
+          "barra de impacto (extensão e catraca)",
+          "soquetes de impacto",
+          "pistola de impacto pneumática",
+          "chave de impacto sem fio",
+          "jogo de chaves combinadas",
+          "jogo de chaves Allen (hex)",
+          "jogo de chaves Torx",
+          "jogo de chaves de fenda e Phillips",
+          "jogo de alicates (universal, bico, corte)",
+          "alicate de pressão (vise-grip)",
+          "alicate para braçadeiras e mangueiras",
+          "martelo de borracha",
+          "martelo de bola",
+          "pé de cabra",
+          "espelho de inspeção",
+          "multímetro digital",
+          "lanterna de cabeça (headlamp)",
+          "lanterna LED de trabalho recarregável",
+          "carregador / jump starter portátil",
+          "carregador de bateria",
+          "testador de bateria",
+          "morsa de bancada",
+          "bancada de trabalho",
+          "esmeril de bancada",
+          "esmerilhadeira angular",
+          "furadeira / parafusadeira sem fio",
+          "jogo de brocas (metal, madeira, concreto)",
+          "jogo de macho e tarraxa (macho e tarraxa)",
+          "saca-polias e extrator de rolamentos",
+          "pressa hidráulica de bancada",
+          "alicate de anéis (snap ring pliers)",
+          "chave para filtro de óleo",
+          "bandeja coletora de óleo",
+          "conjunto de funis",
+          "inflador de pneus com manômetro",
+          "kit de reparo de pneus (plug/remendo)",
+          "chave de roda cruz ou telescópica",
+          "calços e blocos de madeira para apoio",
+          "creeper (carrinho de inspeção) e assento móvel",
+          "banquinho giratório / assento com rodízios",
+          "aspirador de oficina (shop vac)",
+          "lavadora de peças / bandeja de limpeza",
+          "pistola de pintura HVLP e acessórios",
+          "rebitador (pistola de rebite)",
+          "graxeira (pistola de graxa) e cartuchos",
+          "paquímetro (calibrador) e micrômetro",
+          "pistola de ar / soprador",
+          "mangueiras e conexões para compressor",
+          "gaveteiro organizador de peças",
+          "estojo para parafusos, porcas e arruelas",
+          "jogo de limas e escovas de aço",
+          "kit de limpeza e lubrificantes (desengripante, limpador de freio, óleo, graxa)",
+          "scanner OBD2 para diagnóstico automotivo",
+          "compressor de molas (compressor de molas de suspensão)",
+          "separador de terminais e extrator de juntas homocinéticas",
+          "chave para vela / soquete para vela",
+          "medidor de compressão",
+          "ferramentas para sangria de freio (kit de sangria)",
+          "medidor de pressão de combustível",
+          "kit de ferramentas elétricas (serra tico-tico, serra circular portátil)",
+          "organizador de parede (pegboard) e ganchos"
         ]
       }
     }
@@ -197,7 +190,7 @@
     "subcategorias": {
       "moveis": {
         "produtos": [
-          "mesa para escritório com gavetas",
+          "mesa para escritório",
           "cadeira ergonômica",
           "estante de arquivos",
           "armário com fechadura"

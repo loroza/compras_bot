@@ -4,76 +4,77 @@
       "camisa": {
         "essencial": false,
         "produtos": [
-          "basica",
-          "casual manga curta",
-          "casual manga longa",
-          "oversized",
-          "polo",
-          "regata",
-          "social manga curta",
-          "social manga longa",
-          "esporte",
-          "henley"
+          "camisa basica (masculino)",
+          "camisa casual manga curta (masculino)",
+          "camisa casual manga longa (masculino)",
+          "camisa oversized (masculino)",
+          "camisa polo (masculino)",
+          "camisa regata (masculino)",
+          "camisa social manga curta (masculino)",
+          "camisa social manga longa (masculino)",
+          "camisa esporte (masculino)",
+          "camisa henley (masculino)"
         ]
       },
       "calca": {
         "essencial": false,
         "produtos": [
-          "chino",
-          "esportiva",
-          "jeans",
-          "moletom",
-          "sarja",
-          "social",
-          "cargo",
-          "jogger"
+          "calca chino (masculino)",
+          "calca esportiva (masculino)",
+          "calca jeans (masculino)",
+          "calca moletom (masculino)",
+          "calca sarja (masculino)",
+          "calca social (masculino)",
+          "calca cargo (masculino)",
+          "calca jogger (masculino)"
         ]
       },
-      "bermuda/shorts": {
+      "bermuda": {
         "essencial": false,
         "produtos": [
-          "esportiva",
-          "moletom",
-          "sarja",
-          "tactel",
-          "cargo",
-          "jeans",
-          "passeio"
+          "bermuda esportiva (masculino)",
+          "bermuda moletom (masculino)",
+          "bermuda sarja (masculino)",
+          "bermuda tactel (masculino)",
+          "bermuda cargo (masculino)",
+          "bermuda jeans (masculino)",
+          "bermuda passeio (masculino)"
         ]
       },
       "casaco": {
         "essencial": false,
         "produtos": [
-          "corta vento",
-          "jaqueta couro",
-          "jaqueta jeans",
-          "moletom com capuz",
-          "blusa de frio",
-          "moletom sem capuz",
-          "sobretudo",
-          "colete acolchoado",
-          "jaqueta impermeável"
+          "casaco corta vento (masculino)",
+          "jaqueta couro (masculino)",
+          "jaqueta jeans (masculino)",
+          "casaco de moletom com capuz (masculino)",
+          "blusa de frio (masculino)",
+          "casaco de moletom sem capuz (masculino)",
+          "casaco sobretudo (masculino)",
+          "colete acolchoado (masculino)",
+          "jaqueta impermeável (masculino)"
         ]
       },
       "social": {
         "essencial": false,
         "produtos": [
-          "terno completo",
-          "calça social",
-          "gravata",
-          "cinto social",
-          "camisa manga longa",
-          "camisa manga curta",
-          "colete social",
-          "meia social",
-          "paletó avulso"
+          "terno completo (masculino)",
+          "calça social (masculino)",
+          "gravata (masculino)",
+          "cinto social (masculino)",
+          "camisa social manga longa (masculino)",
+          "camisa social manga curta (masculino)",
+          "colete social (masculino)",
+          "meia social (masculino)",
+          "paletó avulso (masculino)",
+          "blazer avulso (masculino)"
         ]
       },
       "intimo": {
         "essencial": true,
         "produtos": [
-          "boxer clássico",
-          "boxer curto",
+          "cueca boxer clássico",
+          "cueca boxer curto",
           "slip",
           "samba-canção",
           "long john (cueca longa)",
@@ -87,12 +88,12 @@
       "pijamas_e_roupao": {
         "essencial": false,
         "produtos": [
-          "pijama curto",
-          "pijama longo",
-          "pijama algodao",
-          "pijama térmico",
-          "roupão de banho",
-          "roupão leve"
+          "pijama curto (masculino)",
+          "pijama longo (masculino)",
+          "pijama algodao (masculino)",
+          "pijama térmico (masculino)",
+          "roupão de banho (masculino)",
+          "roupão leve (masculino)"
         ]
       },
       "roupa_banho": {
@@ -101,7 +102,7 @@
           "sunga clássica",
           "sunga slip",
           "bermuda de banho",
-          "calção surf",
+          "calção de surf",
           "shorts tactel",
           "shorts de praia com forro",
           "bermuda com bolsos",
@@ -111,44 +112,43 @@
       "inverno_casacos_grossos": {
         "essencial": false,
         "produtos": [
-          "casaco de inverno",
-          "sobretudo",
-          "jaqueta acolchoada",
-          "anorak",
-          "parka",
-          "duffle coat"
+          "casaco de inverno (masculino)",
+          "anorak (masculino)",
+          "parka (masculino)",
+          "duffle coat (masculino)"
         ]
       },
       "inverno_roupas_termicas": {
         "essencial": false,
         "produtos": [
-          "segunda pele",
-          "camiseta térmica",
-          "legging térmica",
-          "meia térmica",
-          "calça térmica"
+          "segunda pele (masculino)",
+          "camiseta térmica (masculino)",
+          "legging térmica (masculino)",
+          "meia térmica (masculino)",
+          "calça térmica (masculino)",
+          "bermuda térmica (masculino)"
         ]
       },
       "inverno_acessorios_frio": {
         "essencial": false,
         "produtos": [
-          "gorro de lã",
-          "luvas térmicas",
-          "cachecol de lã",
-          "polaina",
-          "protetor de orelhas"
+          "gorro de lã (masculino)",
+          "luvas térmicas (masculino)",
+          "cachecol de lã (masculino)",
+          "polaina (masculino)",
+          "protetor de orelhas (masculino)"
         ]
       },
       "acessorios": {
         "essencial": false,
         "produtos": [
-          "boné",
-          "cinto couro",
-          "carteira",
-          "lenço de bolso",
-          "cachecol",
-          "luva",
-          "gorro"
+          "boné (masculino)",
+          "cinto couro (masculino)",
+          "carteira o)",
+          "lenço de bolso (masculino)",
+          "cachecol (masculino)",
+          "luva o)",
+          "gorro (masculino)"
         ]
       }
     }
@@ -158,58 +158,58 @@
       "blusa": {
         "essencial": false,
         "produtos": [
-          "manga curta",
-          "manga longa",
-          "social",
-          "regata",
-          "cropped",
-          "com babado",
-          "ombro a ombro",
-          "gola alta"
+          "blusa manga curta (feminino)",
+          "blusa manga longa (feminino)",
+          "blusa social (feminino)",
+          "blusa regata (feminino)",
+          "blusa cropped (feminino)",
+          "blusa com babado (feminino)",
+          "blusa ombro a ombro (feminino)",
+          "blusa gola alta (feminino)"
         ]
       },
       "vestido": {
         "essencial": false,
         "produtos": [
-          "casual",
-          "longo",
-          "midi",
-          "festa",
-          "estampado",
-          "malha",
-          "evasê"
+          "vestido casual",
+          "vestido longo",
+          "vestido midi",
+          "vestido festa",
+          "vestido estampado",
+          "vestido malha",
+          "vestido evasê"
         ]
       },
       "saia": {
         "essencial": false,
         "produtos": [
-          "curta",
-          "midi",
-          "longa",
-          "lápis",
-          "godê",
-          "plissada"
+          "saia curta",
+          "saia midi",
+          "saia longa",
+          "saia lápis",
+          "saia godê",
+          "saia plissada"
         ]
       },
       "calca": {
         "essencial": false,
         "produtos": [
-          "jeans",
-          "legging",
-          "flare",
-          "pantacourt",
-          "alfaiataria",
-          "cargo"
+          "calça jeans (feminino)",
+          "calça legging (feminino)",
+          "calça flare (feminino)",
+          "calça pantacourt (feminino)",
+          "calça alfaiataria (feminino)",
+          "calça cargo (feminino)"
         ]
       },
-      "shorts/bermuda": {
+      "shorts": {
         "essencial": false,
         "produtos": [
-          "jeans",
-          "alfaiataria",
-          "moletom",
-          "tactel",
-          "longa"
+          "shorts jeans (feminino)",
+          "shorts alfaiataria (feminino)",
+          "shorts moletom (feminino)",
+          "shorts tactel (feminino)",
+          "shorts longo (feminino)"
         ]
       },
       "intimo": {
@@ -238,12 +238,12 @@
       "pijamas_e_roupao": {
         "essencial": false,
         "produtos": [
-          "pijama curto",
-          "pijama longo",
+          "pijama curto (feminino)",
+          "pijama longo (feminino)",
           "camisola",
-          "conjunto pijama",
-          "roupão felpudo",
-          "roupão leve"
+          "conjunto pijama (feminino)",
+          "roupão felpudo (feminino)",
+          "roupão leve (feminino)"
         ]
       },
       "roupa_banho": {
@@ -268,46 +268,32 @@
       "inverno_casacos_grossos": {
         "essencial": false,
         "produtos": [
-          "casaco de inverno",
-          "sobretudo",
-          "jaqueta acolchoada",
-          "anorak",
-          "parka",
-          "casaco de lã"
+          "casaco de inverno (feminino)",
+          "casaco sobretudo (feminino)",
+          "jaqueta acolchoada (feminino)",
+          "anorak (feminino)",
+          "parka (feminino)",
+          "casaco de lã (feminino)"
         ]
       },
       "inverno_roupas_termicas": {
         "essencial": false,
         "produtos": [
-          "segunda pele",
-          "camiseta térmica",
-          "legging térmica",
-          "meia térmica",
-          "calça térmica"
+          "segunda pele (feminino)",
+          "camiseta térmica (feminino)",
+          "legging térmica (feminino)",
+          "meia térmica (feminino)",
+          "calça térmica (feminino)"
         ]
       },
       "inverno_acessorios_frio": {
         "essencial": false,
         "produtos": [
-          "gorro de lã",
-          "luvas térmicas",
-          "cachecol de lã",
-          "polaina",
-          "touca forrada"
-        ]
-      },
-      "acessorios": {
-        "essencial": false,
-        "produtos": [
-          "bolsa",
-          "carteira",
-          "bijuterias",
-          "cachecol",
-          "lenço",
-          "chapéu",
-          "óculos sol",
-          "cinto",
-          "touca"
+          "gorro de lã (feminino)",
+          "luvas térmicas (feminino)",
+          "cachecol de lã (feminino)",
+          "polaina (feminino)",
+          "touca forrada (feminino)"
         ]
       },
       "festa_e_ocasiões": {
@@ -381,28 +367,28 @@
       "inverno_casacos_grossos": {
         "essencial": false,
         "produtos": [
-          "casaco inverno infantil",
-          "jaqueta acolchoada infantil",
-          "anorak infantil",
-          "sobretudo infantil"
+          "casaco inverno (infantil)",
+          "jaqueta acolchoada (infantil)",
+          "anorak (infantil)",
+          "sobretudo (infantil)"
         ]
       },
       "inverno_roupas_termicas": {
         "essencial": false,
         "produtos": [
-          "segunda pele infantil",
-          "camiseta térmica infantil",
-          "legging térmica infantil",
-          "meia térmica infantil"
+          "segunda pele (infantil)",
+          "camiseta térmica (infantil)",
+          "legging térmica (infantil)",
+          "meia térmica (infantil)"
         ]
       },
       "inverno_acessorios_frio": {
         "essencial": false,
         "produtos": [
-          "gorro infantil",
-          "luva infantil",
-          "cachecol infantil",
-          "polaina infantil"
+          "gorro (infantil)",
+          "luva (infantil)",
+          "cachecol (infantil)",
+          "polaina (infantil)"
         ]
       }
     }
@@ -412,11 +398,11 @@
       "tenis": {
         "essencial": false,
         "produtos": [
-          "casual",
-          "esportivo",
-          "running",
-          "skate",
-          "infantil"
+          "tenis casual",
+          "tenis esportivo",
+          "tenis de corrida",
+          "tenis de skate",
+          "tenis de basquete"
         ]
       },
       "social": {
@@ -432,11 +418,11 @@
       "sandalia_chinelo": {
         "essencial": false,
         "produtos": [
-          "rasteira",
-          "salto",
-          "borracha",
+          "sandalia rasteira",
+          "sandalia com salto",
+          "chinelo borracha",
           "confortável",
-          "papete"
+          "sandalia papete"
         ]
       },
       "bota": {
@@ -451,10 +437,10 @@
       "infantil": {
         "essencial": true,
         "produtos": [
-          "tênis infantil",
-          "sapato infantil",
-          "sandália infantil",
-          "botinha infantil"
+          "tênis (infantil)",
+          "sapato (infantil)",
+          "sandália (infantil)",
+          "botinha (infantil)"
         ]
       }
     }
@@ -534,6 +520,17 @@
           "camisa ciclismo",
           "luva ciclismo",
           "meia ciclismo"
+        ]
+      },
+      "futebol": {
+        "essencial": false,
+        "produtos": [
+          "camisa futebol",
+          "calção futebol",
+          "meião futebol",
+          "chuteira society",
+          "chuteira campo",
+          "chuteira futsal"
         ]
       }
     }

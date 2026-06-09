@@ -19,7 +19,8 @@
           "produtos": [
             "Filtro de óleo",
             "Filtro de ar do motor",
-            "Filtro de combustível"
+            "Filtro de combustível",
+            "Filtro de cabine (pólen)"
           ]
         },
         "Velas e Ignição": {
@@ -40,6 +41,7 @@
         "Cabeçote e Componentes": {
           "produtos": [
             "Junta de cabeçote",
+            "Junta da tampa de válvulas",
             "Válvula",
             "Retentor de válvula",
             "Comando de válvulas"
@@ -120,10 +122,15 @@
       "Rodas e Pneus": {
         "Pneus": {
           "produtos": [
-            "Pneu 175/65 R14",
-            "Pneu 195/55 R16",
-            "Pneu 205/55 R16",
-            "Pneu 225/45 R17",
+            "Pneu aro 14",
+            "Pneu aro 15",
+            "Pneu aro 16",
+            "Pneu aro 17",
+            "Pneu aro 18",
+            "Pneu aro 19",
+            "Pneu aro 20",
+            "Pneu aro 21",
+            "Pneu aro 22",
             "Pneu reforçado para carga"
           ]
         },
@@ -134,14 +141,6 @@
             "Calota",
             "Válvula para pneu",
             "Sensor de pressão (TPMS)"
-          ]
-        },
-        "Serviços de Pneus": {
-          "produtos": [
-            "Balanceamento",
-            "Alinhamento",
-            "Reparo de pneu (plug)",
-            "Troca de pneu (montagem/desmontagem)"
           ]
         }
       },
@@ -160,6 +159,9 @@
           "produtos": [
             "Lâmpada farol H4",
             "Lâmpada farol H7",
+            "Lâmpada farol H1",
+            "Lâmpada farol H11",
+            "Lâmpada de seta",
             "Lâmpada LED DRL",
             "Farol completo",
             "Lanterna traseira",
@@ -346,30 +348,7 @@
             "Aditivo para redução de emissões",
             "Aditivo descarbonizante"
           ]
-        },
-        "Abastecimento e Bombas": {
-          "produtos": [
-            "Bomba de transferência de combustível",
-            "Bico de abastecimento (bomba)",
-            "Filtro de combustível"
-          ]
         }
-      },
-      "Gás e GLP": {
-        "Conversão e Peças": {
-          "produtos": [
-            "Kit de conversão GNV",
-            "Regulador de pressão GNV",
-            "Cilindro GNV"
-          ]
-        }
-      },
-      "Lubrificação e Óleos": {
-        "produtos": [
-          "Óleo de motor (var. viscosidade)",
-          "Óleo de transmissão",
-          "Óleo hidráulico"
-        ]
       }
     }
   },
@@ -387,9 +366,7 @@
         },
         "Revisões Periódicas": {
           "produtos": [
-            "Revisão 10.000 km",
-            "Revisão 20.000 km",
-            "Revisão 30.000 km",
+            "Revisão periódica a cada 10.000 km",
             "Checklist de inspeção completa"
           ]
         },
@@ -450,7 +427,11 @@
             "Montagem e desmontagem de pneus",
             "Recape/Remolding",
             "Reparo de roda",
-            "Troca de válvula (TPMS)"
+            "Troca de válvula (TPMS)",
+            "Balanceamento",
+            "Alinhamento",
+            "Reparo de pneu (plug)",
+            "Troca de pneu (montagem/desmontagem)"
           ]
         }
       },
