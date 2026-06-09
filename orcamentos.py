@@ -19,6 +19,8 @@ class OrcState(StatesGroup):
     novo_descricao = State()
     novo_link = State()
     novo_selecionar_lista = State()
+    novo_selecionar_categoria = State()
+    novo_selecionar_subcategoria = State()
     novo_selecionar_produto = State()
     novo_qtd = State()
     novo_valor = State()
@@ -28,6 +30,8 @@ class OrcState(StatesGroup):
     editar_selecionar_orc = State()
     editar_menu = State()
     editar_incluir_produto = State()
+    editar_incluir_selecionar_categoria = State()
+    editar_incluir_selecionar_subcategoria = State()
     editar_incluir_produto_qtd = State()
     editar_incluir_produto_valor = State()
     editar_excluir_selecionar_item = State()
@@ -414,6 +418,72 @@ async def orc_novo_selecionar_lista_handler(message: types.Message, state: FSMCo
     if not itens:
         return await message.answer("A lista selecionada não contém itens. Use outra lista ou adicione itens.", reply_markup=kb_voltar())
 
+    # salvar itens da lista no estado para uso nos próximos passos
+    await state.update_data(novo_lista_itens=itens)
+    # montar categorias únicas
+    categorias = []
+    cat_map = {}
+    for i in itens:
+        cat = i.get("categoria") or "Sem categoria"
+        if cat not in cat_map:
+            cat_map[cat] = True
+            categorias.append(cat)
+    btns = [[KeyboardButton(text=c)] for c in categorias]
+    btns.append([KeyboardButton(text="⬅️ Voltar")])
+    kb = ReplyKeyboardMarkup(keyboard=btns, resize_keyboard=True)
+    await state.set_state(OrcState.novo_selecionar_categoria)
+    await state.update_data(novo_categorias_map={c: c for c in categorias})
+    await message.answer("Selecione a categoria:", reply_markup=kb)
+
+
+@router.message(OrcState.novo_selecionar_categoria)
+async def orc_novo_selecionar_categoria_handler(message: types.Message, state: FSMContext):
+    if message.text == "⬅️ Voltar":
+        await state.set_state(OrcState.novo_selecionar_lista)
+        return await orc_novo_listas_prompt(message, state)
+    data = await state.get_data()
+    cat_map = data.get("novo_categorias_map", {})
+    cat = message.text.strip()
+    if cat not in cat_map:
+        return await message.answer("Selecione uma categoria válida.")
+    await state.update_data(novo_categoria=cat)
+    itens = data.get("novo_lista_itens", []) or []
+    # montar subcategorias da categoria selecionada
+    subcats = []
+    sub_map = {}
+    for i in itens:
+        if (i.get("categoria") or "Sem categoria") != cat:
+            continue
+        sub = i.get("subcategoria") or "Sem subcategoria"
+        if sub not in sub_map:
+            sub_map[sub] = True
+            subcats.append(sub)
+    if not subcats:
+        # se não tiver subcategorias, pular para produtos diretamente dentro da categoria
+        subcats = ["Sem subcategoria"]
+        sub_map = {"Sem subcategoria": True}
+    btns = [[KeyboardButton(text=s)] for s in subcats]
+    btns.append([KeyboardButton(text="⬅️ Voltar")])
+    kb = ReplyKeyboardMarkup(keyboard=btns, resize_keyboard=True)
+    await state.set_state(OrcState.novo_selecionar_subcategoria)
+    await state.update_data(novo_subcats_map={s: s for s in subcats})
+    await message.answer(f"Categoria: {cat}\nSelecione a subcategoria:", reply_markup=kb)
+
+
+@router.message(OrcState.novo_selecionar_subcategoria)
+async def orc_novo_selecionar_subcategoria_handler(message: types.Message, state: FSMContext):
+    if message.text == "⬅️ Voltar":
+        await state.set_state(OrcState.novo_selecionar_categoria)
+        return await message.answer("Volte para selecionar categoria.", reply_markup=kb_voltar())
+    data = await state.get_data()
+    sub_map = data.get("novo_subcats_map", {})
+    sub = message.text.strip()
+    if sub not in sub_map:
+        return await message.answer("Selecione uma subcategoria válida.")
+    await state.update_data(novo_subcategoria=sub)
+
+    # montar produtos (apenas daquela lista+categoria+subcategoria), excluindo já adicionados
+    itens = data.get("novo_lista_itens", []) or []
     existentes = { normalize_label(i.get("item_nome") if isinstance(i, dict) else str(i))
                    for i in data.get("novo_itens", []) }
 
@@ -421,6 +491,10 @@ async def orc_novo_selecionar_lista_handler(message: types.Message, state: FSMCo
     prod_map = {}
     prod_map_norm = {}
     for i in itens:
+        item_cat = i.get("categoria") or "Sem categoria"
+        item_sub = i.get("subcategoria") or "Sem subcategoria"
+        if item_cat != data.get("novo_categoria") or item_sub != sub:
+            continue
         label = build_product_label(i)
         norm = normalize_label(label)
         if norm in existentes:
@@ -431,20 +505,20 @@ async def orc_novo_selecionar_lista_handler(message: types.Message, state: FSMCo
         prod_map_norm[norm] = prod_key
 
     if not btns:
-        return await message.answer("Todos os itens desta lista já foram adicionados ao orçamento. Use '✅ Finalizar' ou '➕ Adicionar outro item' para revisar.", reply_markup=kb_confirmar_cancelar())
+        return await message.answer("Nenhum produto disponível nesta subcategoria (ou todos já foram adicionados).", reply_markup=kb_confirmar_cancelar())
 
     btns.append([KeyboardButton(text="⬅️ Voltar")])
     kb = ReplyKeyboardMarkup(keyboard=btns, resize_keyboard=True)
     await state.set_state(OrcState.novo_selecionar_produto)
     await state.update_data(novo_produtos_map=prod_map, novo_produtos_map_norm=prod_map_norm)
-    await message.answer("Selecione um produto da lista para adicionar ao orçamento (categoria > subcategoria > produto > unidade > valor):", reply_markup=kb)
+    await message.answer("Selecione um produto:", reply_markup=kb)
 
 
 @router.message(OrcState.novo_selecionar_produto)
 async def orc_novo_produto_handler(message: types.Message, state: FSMContext):
     if message.text == "⬅️ Voltar":
-        await state.set_state(OrcState.novo_selecionar_lista)
-        return await orc_novo_listas_prompt(message, state)
+        await state.set_state(OrcState.novo_selecionar_subcategoria)
+        return await message.answer("Volte para selecionar subcategoria.", reply_markup=kb_voltar())
 
     data = await state.get_data()
     prod_map = data.get("novo_produtos_map", {}) or {}
@@ -518,33 +592,39 @@ async def orc_novo_confirmar_handler(message: types.Message, state: FSMContext):
         await state.set_state(OrcState.novo_selecionar_lista)
         return await orc_novo_listas_prompt(message, state)
     if message.text == "➕ Adicionar outro item":
+        # reabrir flow de categorias para a mesma lista
         data = await state.get_data()
-        lista_id = data.get("novo_lista_id")
-        itens = await database.pegar_itens_da_lista(lista_id)
+        itens = data.get("novo_lista_itens", []) or []
         if not itens:
             return await message.answer("Lista vazia.")
+        # montar categorias novamente, excluindo já adicionados
         existentes = { normalize_label(i.get("item_nome") if isinstance(i, dict) else str(i))
                        for i in data.get("novo_itens", []) }
-
-        btns = []
-        prod_map = {}
-        prod_map_norm = {}
+        categorias = []
+        cat_map = {}
         for i in itens:
-            label = build_product_label(i)
-            norm = normalize_label(label)
-            if norm in existentes:
-                continue
-            btns.append([KeyboardButton(text=label)])
-            prod_key = i.get("id") if isinstance(i, dict) else i
-            prod_map[label] = prod_key
-            prod_map_norm[norm] = prod_key
-        if not btns:
+            cat = i.get("categoria") or "Sem categoria"
+            # somente adicionar categoria se houver produto não existente nesta categoria
+            # verifica se existe algum produto nessa categoria que não esteja em existentes
+            has_available = False
+            for j in itens:
+                if (j.get("categoria") or "Sem categoria") != cat:
+                    continue
+                lab = build_product_label(j)
+                if normalize_label(lab) not in existentes:
+                    has_available = True
+                    break
+            if has_available and cat not in cat_map:
+                cat_map[cat] = True
+                categorias.append(cat)
+        if not categorias:
             return await message.answer("Todos os itens desta lista já foram adicionados ao orçamento.", reply_markup=kb_confirmar_cancelar())
+        btns = [[KeyboardButton(text=c)] for c in categorias]
         btns.append([KeyboardButton(text="⬅️ Voltar")])
         kb = ReplyKeyboardMarkup(keyboard=btns, resize_keyboard=True)
-        await state.set_state(OrcState.novo_selecionar_produto)
-        await state.update_data(novo_produtos_map=prod_map, novo_produtos_map_norm=prod_map_norm)
-        return await message.answer("Selecione produto:", reply_markup=kb)
+        await state.set_state(OrcState.novo_selecionar_categoria)
+        await state.update_data(novo_categorias_map={c: c for c in categorias})
+        return await message.answer("Selecione a categoria:", reply_markup=kb)
 
     if message.text == "✅ Finalizar":
         data = await state.get_data()
@@ -693,6 +773,86 @@ async def orc_editar_incluir_produto_handler(message: types.Message, state: FSMC
     itens = await database.pegar_itens_da_lista(lista_id)
     if not itens:
         return await message.answer("Lista vazia.")
+    # salvar itens da lista e lista_id
+    await state.update_data(editar_incluir_lista_id=lista_id, editar_incluir_lista_itens=itens)
+    # montar categorias (apenas as que têm produtos disponíveis que ainda não estão no orçamento)
+    orc_id = data.get("editar_orc_id")
+    existentes_rows = await listar_itens_orcamento(orc_id) if orc_id else []
+    existentes = { normalize_label(r.get("item_nome")) for r in existentes_rows }
+
+    categorias = []
+    cat_map = {}
+    for i in itens:
+        cat = i.get("categoria") or "Sem categoria"
+        # checar se existe produto nessa categoria que não foi adicionado
+        has_available = False
+        for j in itens:
+            if (j.get("categoria") or "Sem categoria") != cat:
+                continue
+            if normalize_label(build_product_label(j)) not in existentes:
+                has_available = True
+                break
+        if has_available and cat not in cat_map:
+            cat_map[cat] = True
+            categorias.append(cat)
+
+    if not categorias:
+        return await message.answer("Todos os itens desta lista já constam no orçamento selecionado.", reply_markup=kb_voltar())
+
+    btns = [[KeyboardButton(text=c)] for c in categorias]
+    btns.append([KeyboardButton(text="⬅️ Voltar")])
+    kb = ReplyKeyboardMarkup(keyboard=btns, resize_keyboard=True)
+    await state.update_data(editar_incluir_map_listas=map_listas)
+    await state.set_state(OrcState.editar_incluir_selecionar_categoria)
+    await state.update_data(editar_incluir_categorias_map={c: c for c in categorias})
+    return await message.answer("Selecione a categoria:", reply_markup=kb)
+
+
+@router.message(OrcState.editar_incluir_selecionar_categoria)
+async def orc_editar_incluir_selecionar_categoria_handler(message: types.Message, state: FSMContext):
+    if message.text == "⬅️ Voltar":
+        await state.set_state(OrcState.editar_incluir_produto)
+        return await message.answer("Volte para selecionar lista.", reply_markup=kb_voltar())
+    data = await state.get_data()
+    cat_map = data.get("editar_incluir_categorias_map", {})
+    cat = message.text.strip()
+    if cat not in cat_map:
+        return await message.answer("Selecione uma categoria válida.")
+    await state.update_data(editar_incluir_categoria=cat)
+    itens = data.get("editar_incluir_lista_itens", []) or []
+    subcats = []
+    sub_map = {}
+    for i in itens:
+        if (i.get("categoria") or "Sem categoria") != cat:
+            continue
+        sub = i.get("subcategoria") or "Sem subcategoria"
+        if sub not in sub_map:
+            sub_map[sub] = True
+            subcats.append(sub)
+    if not subcats:
+        subcats = ["Sem subcategoria"]
+        sub_map = {"Sem subcategoria": True}
+    btns = [[KeyboardButton(text=s)] for s in subcats]
+    btns.append([KeyboardButton(text="⬅️ Voltar")])
+    kb = ReplyKeyboardMarkup(keyboard=btns, resize_keyboard=True)
+    await state.set_state(OrcState.editar_incluir_selecionar_subcategoria)
+    await state.update_data(editar_incluir_subcats_map={s: s for s in subcats})
+    return await message.answer(f"Categoria: {cat}\nSelecione a subcategoria:", reply_markup=kb)
+
+
+@router.message(OrcState.editar_incluir_selecionar_subcategoria)
+async def orc_editar_incluir_selecionar_subcategoria_handler(message: types.Message, state: FSMContext):
+    if message.text == "⬅️ Voltar":
+        await state.set_state(OrcState.editar_incluir_selecionar_categoria)
+        return await message.answer("Volte para selecionar categoria.", reply_markup=kb_voltar())
+    data = await state.get_data()
+    sub_map = data.get("editar_incluir_subcats_map", {})
+    sub = message.text.strip()
+    if sub not in sub_map:
+        return await message.answer("Selecione uma subcategoria válida.")
+    await state.update_data(editar_incluir_subcategoria=sub)
+
+    itens = data.get("editar_incluir_lista_itens", []) or []
     orc_id = data.get("editar_orc_id")
     existentes_rows = await listar_itens_orcamento(orc_id) if orc_id else []
     existentes = { normalize_label(r.get("item_nome")) for r in existentes_rows }
@@ -701,6 +861,10 @@ async def orc_editar_incluir_produto_handler(message: types.Message, state: FSMC
     prod_map = {}
     prod_map_norm = {}
     for i in itens:
+        item_cat = i.get("categoria") or "Sem categoria"
+        item_sub = i.get("subcategoria") or "Sem subcategoria"
+        if item_cat != data.get("editar_incluir_categoria") or item_sub != sub:
+            continue
         label = build_product_label(i)
         norm = normalize_label(label)
         if norm in existentes:
@@ -709,20 +873,22 @@ async def orc_editar_incluir_produto_handler(message: types.Message, state: FSMC
         prod_key = i.get("id") if isinstance(i, dict) else i
         prod_map[label] = prod_key
         prod_map_norm[norm] = prod_key
+
     if not btns:
-        return await message.answer("Todos os itens desta lista já constam no orçamento selecionado.", reply_markup=kb_voltar())
+        return await message.answer("Nenhum produto disponível nesta subcategoria (ou todos já foram adicionados).", reply_markup=kb_voltar())
+
     btns.append([KeyboardButton(text="⬅️ Voltar")])
     kb = ReplyKeyboardMarkup(keyboard=btns, resize_keyboard=True)
-    await state.update_data(editar_incluir_lista_id=lista_id, editar_incluir_produtos_map=prod_map, editar_incluir_produtos_map_norm=prod_map_norm)
+    await state.update_data(editar_incluir_produtos_map=prod_map, editar_incluir_produtos_map_norm=prod_map_norm)
     await state.set_state(OrcState.editar_incluir_produto_qtd)
-    await message.answer("Selecione o produto para incluir (categoria > subcategoria > produto > unidade > valor):", reply_markup=kb)
+    await message.answer("Selecione o produto para incluir (ou ⬅️ Voltar):", reply_markup=kb)
 
 
 @router.message(OrcState.editar_incluir_produto_qtd)
 async def orc_editar_incluir_produto_qtd_handler(message: types.Message, state: FSMContext):
     if message.text == "⬅️ Voltar":
-        await state.set_state(OrcState.editar_menu)
-        return await message.answer("Voltando ao menu de edição.")
+        await state.set_state(OrcState.editar_incluir_selecionar_subcategoria)
+        return await message.answer("Volte para selecionar subcategoria.", reply_markup=kb_voltar())
     data = await state.get_data()
     prod_map = data.get("editar_incluir_produtos_map", {}) or {}
     prod_map_norm = data.get("editar_incluir_produtos_map_norm", {}) or {}
@@ -787,7 +953,6 @@ async def orc_editar_incluir_produto_valor_handler(message: types.Message, state
         return await message.answer("Erro ao adicionar item. Tente novamente.")
 
     # não limpar a lista_id — vamos reabrir a seleção para adicionar mais itens da mesma lista
-    # obter itens restantes da lista, excluindo os já adicionados no orçamento
     itens_da_lista = await database.pegar_itens_da_lista(lista_id) if lista_id else []
     existentes_rows = await listar_itens_orcamento(orc_id) if orc_id else []
     existentes = { normalize_label(r.get("item_nome")) for r in existentes_rows }
@@ -812,20 +977,42 @@ async def orc_editar_incluir_produto_valor_handler(message: types.Message, state
         texto += f"• {build_orc_item_label(it)}\n"
 
     if not btns:
-        # se não há mais itens disponíveis nesta lista, voltar ao menu de edição
         await state.update_data(editar_incluir_produto=None, editar_incluir_qtd=None, editar_incluir_lista_id=None,
                                 editar_incluir_produtos_map=None, editar_incluir_produtos_map_norm=None)
         await state.set_state(OrcState.editar_menu)
         return await message.answer(texto + "\nTodos os itens desta lista já constam no orçamento.", reply_markup=ReplyKeyboardRemove())
 
-    # caso ainda existam itens, mostrar keyboard para selecionar próximo produto
+    # se ainda existirem produtos, reabrir fluxo de categorias/subcategorias:
+    # em vez de exibir produtos direto, mostramos novamente categorias disponíveis
+    itens = itens_da_lista
+    categorias = []
+    cat_map = {}
+    for i in itens:
+        cat = i.get("categoria") or "Sem categoria"
+        # checar se essa categoria tem produtos disponíveis não adicionados
+        has_available = False
+        for j in itens:
+            if (j.get("categoria") or "Sem categoria") != cat:
+                continue
+            if normalize_label(build_product_label(j)) not in existentes:
+                has_available = True
+                break
+        if has_available and cat not in cat_map:
+            cat_map[cat] = True
+            categorias.append(cat)
+
+    if not categorias:
+        await state.set_state(OrcState.editar_menu)
+        return await message.answer(texto + "\nNenhuma categoria restante com produtos disponíveis.", reply_markup=ReplyKeyboardRemove())
+
+    btns = [[KeyboardButton(text=c)] for c in categorias]
     btns.append([KeyboardButton(text="⬅️ Voltar")])
     kb = ReplyKeyboardMarkup(keyboard=btns, resize_keyboard=True)
-    await state.update_data(editar_incluir_produtos_map=prod_map, editar_incluir_produtos_map_norm=prod_map_norm,
-                            editar_incluir_produto=None, editar_incluir_qtd=None)
-    # voltar para o estado que recebe a seleção do produto (mesma máquina de estados usada antes)
-    await state.set_state(OrcState.editar_incluir_produto_qtd)
-    return await message.answer(texto + "\nSelecione o próximo produto para incluir (ou ⬅️ Voltar):", reply_markup=kb)
+    await state.update_data(editar_incluir_produto=None, editar_incluir_qtd=None,
+                            editar_incluir_produtos_map=prod_map, editar_incluir_produtos_map_norm=prod_map_norm,
+                            editar_incluir_categorias_map={c: c for c in categorias})
+    await state.set_state(OrcState.editar_incluir_selecionar_categoria)
+    return await message.answer(texto + "\nSelecione a próxima categoria para incluir itens:", reply_markup=kb)
 
 
 @router.message(OrcState.editar_excluir_selecionar_item)
