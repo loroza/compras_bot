@@ -536,7 +536,7 @@ async def listar_itens_historico(compra_id):
             SELECT item_nome, quantidade, valor_unitario
             FROM historico_itens
             WHERE compra_id = $1
-            ORDER BY id
+            ORDER BY item_nome
             """,
             compra_id
         )

@@ -1,0 +1,344 @@
+{
+  "cozinha": {
+    "subcategorias": {
+      "eletrodomesticos_grandes": {
+        "essencial": true,
+        "produtos": [
+          "geladeira frost-free",
+          "freezer vertical",
+          "forno embutido",
+          "cooktop 4 bocas",
+          "lava-louças",
+          "coifa de parede"
+        ]
+      },
+      "mobiliario_planejado": {
+        "produtos": [
+          "armario de cozinha planejado",
+          "paneleiro embutido",
+          "balcao/ilha de cozinha",
+          "gabinete para pia inox"
+        ]
+      },
+      "instalacao_hidraulica": {
+        "produtos": [
+          "misturador monocomando cozinha",
+          "registro de gaveta",
+          "sifao inox 3/4",
+          "tubulação PPR/PEX e conexões"
+        ]
+      },
+      "bancadas_e_pias": {
+        "produtos": [
+          "bancada em granito/silestone",
+          "pia inox 1 cuba/2 cubas",
+          "torneira com filtro embutido"
+        ]
+      },
+      "acessorios_fixacao_e_instalacao": {
+        "produtos": [
+          "suportes metálicos para armário pesado",
+          "buchas e parafusos de expansão",
+          "kit instalação de forno embutido"
+        ]
+      }
+    }
+  },
+  "sala": {
+    "subcategorias": {
+      "mobiliario": {
+        "produtos": [
+          "sofa 2/3 lugares",
+          "rack para TV",
+          "estante modular",
+          "mesa de centro"
+        ]
+      },
+      "audio_video": {
+        "produtos": [
+          "televisor 4K",
+          "soundbar / home theater",
+          "projetor + tela retrátil",
+          "suporte articulado para TV"
+        ]
+      },
+      "iluminacao_e_ambiente": {
+        "produtos": [
+          "lustre/pendente decorativo",
+          "plafon embutir LED",
+          "dimmer para iluminação",
+          "luminária de piso"
+        ]
+      },
+      "piso_e_acabamento": {
+        "produtos": [
+          "rodapé MDF/porcelanato",
+          "assoalho vinílico laminado",
+          "tapete sob medida"
+        ]
+      }
+    }
+  },
+  "quartos": {
+    "subcategorias": {
+      "mobiliario_e_roupa_de_cama": {
+        "essencial": true,
+        "produtos": [
+          "cama box casal/solteiro",
+          "colchão espuma/mola/viscoelástico",
+          "guarda-roupa modulado",
+          "cômoda com gavetas"
+        ]
+      },
+      "armarios_embutidos": {
+        "produtos": [
+          "painel porta correr",
+          "prateleiras e cabideiros moduláveis",
+          "organizador de closet"
+        ]
+      },
+      "controle_ambiente": {
+        "produtos": [
+          "ar-condicionado split inverter",
+          "persiana rolô blackout",
+          "ventilador de teto"
+        ]
+      }
+    }
+  },
+  "banheiros": {
+    "subcategorias": {
+      "loucas_e_pecas": {
+        "essencial": true,
+        "produtos": [
+          "vaso sanitário com caixa acoplada",
+          "lavatório com bancada",
+          "box de vidro temperado",
+          "cuba sobrepor"
+        ]
+      },
+      "hidraulica_banheiro": {
+        "produtos": [
+          "misturador monocomando banho",
+          "registro angular",
+          "válvula de descarga dual-flush",
+          "sifão e conexões para esgoto"
+        ]
+      },
+      "aquecimento": {
+        "produtos": [
+          "aquecedor de passagem (gás)",
+          "aquecedor elétrico de passagem",
+          "resistência para aquecedor"
+        ]
+      },
+      "acessorios_fixacao": {
+        "produtos": [
+          "suportes para box",
+          "kit instalação de cuba",
+          "vedantes e silicone sanitário"
+        ]
+      }
+    }
+  },
+  "lavanderia": {
+    "subcategorias": {
+      "eletrodomesticos": {
+        "produtos": [
+          "máquina de lavar roupa (carga frontal/vertical)",
+          "secadora de roupas",
+          "tanque de inox/cerâmica",
+          "armário para produtos e acessórios"
+        ]
+      },
+      "drenagem_e_instalacao": {
+        "produtos": [
+          "bomba de drenagem/condensado",
+          "tubulação corrugada para escoamento",
+          "suportes antivibração para máquina"
+        ]
+      },
+      "servicos_instalacao": {
+        "produtos": [
+          "instalação hidráulica de lavanderia (profissional)",
+          "instalação elétrica dedicada (tomada 20A)"
+        ]
+      }
+    }
+  },
+  "garagem": {
+    "subcategorias": {
+      "portao_e_acesso": {
+        "produtos": [
+          "portão automático basculante/novo",
+          "motor automatizador para portão",
+          "controle remoto e receptor",
+          "sensores de segurança para portão"
+        ]
+      },
+      "armazenamento_e_organizacao": {
+        "produtos": [
+          "estante metálica pesada",
+          "armário metálico com fechadura",
+          "ganchos e suportes para bicicletas"
+        ]
+      },
+      "oficina_e_ferramentas": {
+        "produtos": [
+          "compressor de ar portátil",
+          "macaco hidráulico 2-3t",
+          "conjunto de soquetes e chaves",
+          "carrinho para ferramentas"
+        ]
+      }
+    }
+  },
+  "escritorio": {
+    "subcategorias": {
+      "moveis": {
+        "produtos": [
+          "mesa para escritório com gavetas",
+          "cadeira ergonômica",
+          "estante de arquivos",
+          "armário com fechadura"
+        ]
+      },
+      "infra_rede_e_energia": {
+        "produtos": [
+          "roteador mesh / access point",
+          "switch gigabit",
+          "no-break (UPS) para estação",
+          "rack de parede pequena"
+        ]
+      },
+      "iluminacao_ergonomica": {
+        "produtos": [
+          "luminária de mesa com ajuste de temperatura",
+          "plafon embutir LED anti-reflexo"
+        ]
+      }
+    }
+  },
+  "jardim_e_externo": {
+    "subcategorias": {
+      "equipamentos_jardim": {
+        "produtos": [
+          "cortador de grama elétrico/gasolina",
+          "motosserra elétrica/bateria",
+          "sistema de irrigação por gotejamento (kit)",
+          "motobomba para jardim"
+        ]
+      },
+      "paisagismo": {
+        "produtos": [
+          "pedras decorativas e brita",
+          "substrato e terra vegetal",
+          "manta anti-ervas",
+          "iluminação externa solar/LED"
+        ]
+      },
+      "mobiliario_externo": {
+        "produtos": [
+          "mesa externa resistente às intempéries",
+          "conjunto de cadeiras para jardim",
+          "guarda-sol / cobertura retrátil"
+        ]
+      }
+    }
+  },
+  "varanda_e_entrada": {
+    "subcategorias": {
+      "acessorios_externos": {
+        "produtos": [
+          "tapete de entrada resistente",
+          "suporte para correspondência",
+          "porta-chaves mural",
+          "guarda-corpo e corrimão"
+        ]
+      },
+      "iluminacao_externa": {
+        "produtos": [
+          "arandela externa em aço inox",
+          "poste de jardim para iluminação",
+          "sensor de presença externo"
+        ]
+      }
+    }
+  },
+  "deposito_e_armazenamento": {
+    "subcategorias": {
+      "organizacao_e_caixas": {
+        "produtos": [
+          "caixas organizadoras plásticas (vários tamanhos)",
+          "prateleira metálica modular",
+          "contentor empilhável"
+        ]
+      },
+      "seguranca": {
+        "produtos": [
+          "cadeado de alta segurança",
+          "trava de porta com reforço",
+          "estante com parafusos de fixação no chão"
+        ]
+      }
+    }
+  },
+  "infraestrutura_eletrica": {
+    "subcategorias": {
+      "protecoes_e_quadro": {
+        "essencial": true,
+        "produtos": [
+          "quadro de disjuntores residência (montado)",
+          "disjuntor termomagnético",
+          "diferencial residual (DR)",
+          "contator e relés de proteção"
+        ]
+      },
+      "cabos_e_acessorios": {
+        "produtos": [
+          "cabos 2,5mm² / 4mm² / 6mm²",
+          "calhas para passagem de cabos",
+          "conectores e bornes"
+        ]
+      }
+    }
+  },
+  "infraestrutura_hidraulica": {
+    "subcategorias": {
+      "bombas_e_reservatorios": {
+        "produtos": [
+          "bomba pressurizadora",
+          "bomba submersível para poço",
+          "calha e reservatório de agua 500-1000L"
+        ]
+      },
+      "tubulacoes_e_conexoes": {
+        "produtos": [
+          "tubos PVC/PEAD 50mm/75mm",
+          "válvulas de retenção e esfera",
+          "filtros de linha para entrada de água"
+        ]
+      }
+    }
+  },
+  "manutencao_e_servicos": {
+    "subcategorias": {
+      "servicos_profissionais": {
+        "produtos": [
+          "instalação elétrica residencial (profissional)",
+          "serviço de encanador (hidráulica)",
+          "montagem de móveis planejados",
+          "reforma de bancada/azulejos (serviço)"
+        ]
+      },
+      "ferramentas_profissionais": {
+        "produtos": [
+          "parafusadeira/impacto 18V com baterias extras",
+          "serra circular de bancada",
+          "estação de solda com controle",
+          "multímetro profissional"
+        ]
+      }
+    }
+  }
+}
