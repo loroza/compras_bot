@@ -1,0 +1,541 @@
+{
+  "masculino": {
+    "subcategoria": {
+      "camisa": {
+        "essencial": false,
+        "produtos": [
+          "basica",
+          "casual manga curta",
+          "casual manga longa",
+          "oversized",
+          "polo",
+          "regata",
+          "social manga curta",
+          "social manga longa",
+          "esporte",
+          "henley"
+        ]
+      },
+      "calca": {
+        "essencial": false,
+        "produtos": [
+          "chino",
+          "esportiva",
+          "jeans",
+          "moletom",
+          "sarja",
+          "social",
+          "cargo",
+          "jogger"
+        ]
+      },
+      "bermuda/shorts": {
+        "essencial": false,
+        "produtos": [
+          "esportiva",
+          "moletom",
+          "sarja",
+          "tactel",
+          "cargo",
+          "jeans",
+          "passeio"
+        ]
+      },
+      "casaco": {
+        "essencial": false,
+        "produtos": [
+          "corta vento",
+          "jaqueta couro",
+          "jaqueta jeans",
+          "moletom com capuz",
+          "blusa de frio",
+          "moletom sem capuz",
+          "sobretudo",
+          "colete acolchoado",
+          "jaqueta impermeável"
+        ]
+      },
+      "social": {
+        "essencial": false,
+        "produtos": [
+          "terno completo",
+          "calça social",
+          "gravata",
+          "cinto social",
+          "camisa manga longa",
+          "camisa manga curta",
+          "colete social",
+          "meia social",
+          "paletó avulso"
+        ]
+      },
+      "intimo": {
+        "essencial": true,
+        "produtos": [
+          "boxer clássico",
+          "boxer curto",
+          "slip",
+          "samba-canção",
+          "long john (cueca longa)",
+          "cueca com abertura frontal",
+          "cueca térmica",
+          "cueca sem costura",
+          "cueca modeladora",
+          "cueca esportiva"
+        ]
+      },
+      "pijamas_e_roupao": {
+        "essencial": false,
+        "produtos": [
+          "pijama curto",
+          "pijama longo",
+          "pijama algodao",
+          "pijama térmico",
+          "roupão de banho",
+          "roupão leve"
+        ]
+      },
+      "roupa_banho": {
+        "essencial": true,
+        "produtos": [
+          "sunga clássica",
+          "sunga slip",
+          "bermuda de banho",
+          "calção surf",
+          "shorts tactel",
+          "shorts de praia com forro",
+          "bermuda com bolsos",
+          "tank top praia"
+        ]
+      },
+      "inverno_casacos_grossos": {
+        "essencial": false,
+        "produtos": [
+          "casaco de inverno",
+          "sobretudo",
+          "jaqueta acolchoada",
+          "anorak",
+          "parka",
+          "duffle coat"
+        ]
+      },
+      "inverno_roupas_termicas": {
+        "essencial": false,
+        "produtos": [
+          "segunda pele",
+          "camiseta térmica",
+          "legging térmica",
+          "meia térmica",
+          "calça térmica"
+        ]
+      },
+      "inverno_acessorios_frio": {
+        "essencial": false,
+        "produtos": [
+          "gorro de lã",
+          "luvas térmicas",
+          "cachecol de lã",
+          "polaina",
+          "protetor de orelhas"
+        ]
+      },
+      "acessorios": {
+        "essencial": false,
+        "produtos": [
+          "boné",
+          "cinto couro",
+          "carteira",
+          "lenço de bolso",
+          "cachecol",
+          "luva",
+          "gorro"
+        ]
+      }
+    }
+  },
+  "feminino": {
+    "subcategoria": {
+      "blusa": {
+        "essencial": false,
+        "produtos": [
+          "manga curta",
+          "manga longa",
+          "social",
+          "regata",
+          "cropped",
+          "com babado",
+          "ombro a ombro",
+          "gola alta"
+        ]
+      },
+      "vestido": {
+        "essencial": false,
+        "produtos": [
+          "casual",
+          "longo",
+          "midi",
+          "festa",
+          "estampado",
+          "malha",
+          "evasê"
+        ]
+      },
+      "saia": {
+        "essencial": false,
+        "produtos": [
+          "curta",
+          "midi",
+          "longa",
+          "lápis",
+          "godê",
+          "plissada"
+        ]
+      },
+      "calca": {
+        "essencial": false,
+        "produtos": [
+          "jeans",
+          "legging",
+          "flare",
+          "pantacourt",
+          "alfaiataria",
+          "cargo"
+        ]
+      },
+      "shorts/bermuda": {
+        "essencial": false,
+        "produtos": [
+          "jeans",
+          "alfaiataria",
+          "moletom",
+          "tactel",
+          "longa"
+        ]
+      },
+      "intimo": {
+        "essencial": true,
+        "produtos": [
+          "sutiã com aro",
+          "sutiã sem aro",
+          "sutiã esportivo",
+          "sutiã amamentação",
+          "sutiã push-up",
+          "sutiã balconet",
+          "sutiã sem costura",
+          "conjunto lingerie",
+          "calcinha tanga",
+          "calcinha fio dental",
+          "calcinha caleçon",
+          "calcinha cintura alta",
+          "calcinha cintura baixa",
+          "calcinha modeladora",
+          "calcinha sem costura",
+          "calcinha renda",
+          "calcinha algodão",
+          "calcinha maternidade"
+        ]
+      },
+      "pijamas_e_roupao": {
+        "essencial": false,
+        "produtos": [
+          "pijama curto",
+          "pijama longo",
+          "camisola",
+          "conjunto pijama",
+          "roupão felpudo",
+          "roupão leve"
+        ]
+      },
+      "roupa_banho": {
+        "essencial": true,
+        "produtos": [
+          "biquíni conjunto",
+          "biquíni cortininha",
+          "biquíni hotpant",
+          "biquíni asa delta",
+          "biquíni tomara que caia",
+          "biquíni com bojo",
+          "maiô inteiro",
+          "maiô modelador",
+          "maiô frente única",
+          "maiô engana-mamãe",
+          "maiô costas nadador",
+          "saída de praia",
+          "pareô/canga",
+          "vestido leve praia"
+        ]
+      },
+      "inverno_casacos_grossos": {
+        "essencial": false,
+        "produtos": [
+          "casaco de inverno",
+          "sobretudo",
+          "jaqueta acolchoada",
+          "anorak",
+          "parka",
+          "casaco de lã"
+        ]
+      },
+      "inverno_roupas_termicas": {
+        "essencial": false,
+        "produtos": [
+          "segunda pele",
+          "camiseta térmica",
+          "legging térmica",
+          "meia térmica",
+          "calça térmica"
+        ]
+      },
+      "inverno_acessorios_frio": {
+        "essencial": false,
+        "produtos": [
+          "gorro de lã",
+          "luvas térmicas",
+          "cachecol de lã",
+          "polaina",
+          "touca forrada"
+        ]
+      },
+      "acessorios": {
+        "essencial": false,
+        "produtos": [
+          "bolsa",
+          "carteira",
+          "bijuterias",
+          "cachecol",
+          "lenço",
+          "chapéu",
+          "óculos sol",
+          "cinto",
+          "touca"
+        ]
+      },
+      "festa_e_ocasiões": {
+        "essencial": false,
+        "produtos": [
+          "vestido festa",
+          "saia festa",
+          "bolsa clutch",
+          "salto alto",
+          "acessórios festa",
+          "cinta modeladora",
+          "xale elegante"
+        ]
+      }
+    }
+  },
+  "infantil": {
+    "subcategoria": {
+      "bebe": {
+        "essencial": true,
+        "produtos": [
+          "body",
+          "macacão",
+          "conjunto",
+          "babador",
+          "meia",
+          "touca",
+          "luvas",
+          "fralda-roupa (genérica)"
+        ]
+      },
+      "menino": {
+        "essencial": true,
+        "produtos": [
+          "camiseta",
+          "bermuda",
+          "calça",
+          "moletom",
+          "jaqueta",
+          "pijama",
+          "tênis infantil",
+          "sunga infantil",
+          "shorts praia infantil",
+          "cueca infantil"
+        ]
+      },
+      "menina": {
+        "essencial": true,
+        "produtos": [
+          "vestido",
+          "saia",
+          "blusa",
+          "short",
+          "pijama",
+          "meia antiderrapante",
+          "sapatilha",
+          "biquíni infantil",
+          "maiô infantil",
+          "calcinha infantil"
+        ]
+      },
+      "escolar": {
+        "essencial": false,
+        "produtos": [
+          "uniforme genérico",
+          "mochila escolar",
+          "jaleco escolar",
+          "sapato escolar"
+        ]
+      },
+      "inverno_casacos_grossos": {
+        "essencial": false,
+        "produtos": [
+          "casaco inverno infantil",
+          "jaqueta acolchoada infantil",
+          "anorak infantil",
+          "sobretudo infantil"
+        ]
+      },
+      "inverno_roupas_termicas": {
+        "essencial": false,
+        "produtos": [
+          "segunda pele infantil",
+          "camiseta térmica infantil",
+          "legging térmica infantil",
+          "meia térmica infantil"
+        ]
+      },
+      "inverno_acessorios_frio": {
+        "essencial": false,
+        "produtos": [
+          "gorro infantil",
+          "luva infantil",
+          "cachecol infantil",
+          "polaina infantil"
+        ]
+      }
+    }
+  },
+  "calcados": {
+    "subcategoria": {
+      "tenis": {
+        "essencial": false,
+        "produtos": [
+          "casual",
+          "esportivo",
+          "running",
+          "skate",
+          "infantil"
+        ]
+      },
+      "social": {
+        "essencial": false,
+        "produtos": [
+          "oxford",
+          "loafer",
+          "scarpin",
+          "sapato social (masculino)",
+          "sapato social (feminino)"
+        ]
+      },
+      "sandalia_chinelo": {
+        "essencial": false,
+        "produtos": [
+          "rasteira",
+          "salto",
+          "borracha",
+          "confortável",
+          "papete"
+        ]
+      },
+      "bota": {
+        "essencial": false,
+        "produtos": [
+          "feminina",
+          "masculina",
+          "forrada",
+          "coturno"
+        ]
+      },
+      "infantil": {
+        "essencial": true,
+        "produtos": [
+          "tênis infantil",
+          "sapato infantil",
+          "sandália infantil",
+          "botinha infantil"
+        ]
+      }
+    }
+  },
+  "acessorios": {
+    "subcategoria": {
+      "bolsas_e_mochilas": {
+        "essencial": false,
+        "produtos": [
+          "bolsa tiracolo",
+          "bolsa ombro",
+          "mochila casual",
+          "mochila escolar",
+          "bolsa viagem pequena"
+        ]
+      },
+      "cintos_e_carteiras": {
+        "essencial": false,
+        "produtos": [
+          "cinto masculino couro",
+          "cinto feminino fino",
+          "carteira masculina",
+          "carteira feminina",
+          "porta-cartões"
+        ]
+      },
+      "chapeus_e_gorros": {
+        "essencial": false,
+        "produtos": [
+          "boné aba curva",
+          "boné aba reta",
+          "chapéu praia",
+          "gorro lã",
+          "boina"
+        ]
+      },
+      "bijuterias_relogios": {
+        "essencial": false,
+        "produtos": [
+          "colar curto",
+          "colar longo",
+          "brincos",
+          "pulseira",
+          "anel",
+          "relógio analógico",
+          "relógio digital"
+        ]
+      }
+    }
+  },
+  "esportes_e_atividade_fisica": {
+    "subcategoria": {
+      "fitness": {
+        "essencial": false,
+        "produtos": [
+          "legging fitness",
+          "top esportivo",
+          "camiseta dry fit",
+          "shorts corrida",
+          "agasalho esportivo",
+          "jaqueta corta vento"
+        ]
+      },
+      "natação": {
+        "essencial": false,
+        "produtos": [
+          "touca natação",
+          "óculos natação",
+          "maiô treino",
+          "sunga treino"
+        ]
+      },
+      "ciclismo": {
+        "essencial": false,
+        "produtos": [
+          "bermuda ciclismo",
+          "camisa ciclismo",
+          "luva ciclismo",
+          "meia ciclismo"
+        ]
+      }
+    }
+  }
+}

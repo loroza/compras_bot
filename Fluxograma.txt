@@ -1,0 +1,28 @@
+/start
+    ✅Escolha do departamento
+    Menu principal:
+        ✅Compras
+        ✅Cadastro
+        ✅Histórico
+        ⚠️Orçamentos (Menu de orçamentos)
+            ⚠️Novo orçamento
+                ✅Tipo de loja (Física, E-commerce)
+                ✅Nome da loja do orçamento
+                ✅Descrição
+                ✅Link (Caso o tipo de loja seja E-commerce)
+                ✅Seleciona a lista de compra que deseja fazer o orçamento
+                ⚠️Seleciona o produto cadastrado na lista (Categoria > Subcategoria > Produto > Unidade > Valor Unitário)
+            ⚠️Editar orçamento
+                ⚠️Incluir item
+                    ⚠️Seleciona o produto cadastrado na lista (Categoria > Subcategoria > Produto > Unidade > Valor Unitário)
+                    ✅Voltar (Volta para o menu anterior)
+                ⚠️Excluir item (Caso todos os itens do orçamento seja excluído automáticamente vai ser excluído o orçamento)
+                    ⚠️Seleciona o produto cadastrado no orçamento para excluir (Categoria > Subcategoria > Produto > Unidade > Valor Unitário)
+                    ✅Voltar (Volta para o menu anterior)
+                ⚠️Editar item (Mostrar itens novamente após um item ser editado)
+                    ✅Voltar (Volta para o menu anterior)
+                ✅Voltar (Volta para o menu anterior)
+            ✅Histórico (Mesmo esquema do histórico de compras, aparecerá uma lista com todos os orçamentos cadastrados com opção de escolha. O escolhido deverá ser mostrado o extrato do orçamento)
+            ✅Voltar (Volta para o menu anterior)
+        ✅Menu principal (Voltar para o menu principal)
+        ✅Trocar departamento (Voltar para Escolha do departamento)
