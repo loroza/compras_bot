@@ -759,6 +759,7 @@ async def orc_editar_incluir_produto_qtd_handler(message: types.Message, state: 
 @router.message(OrcState.editar_incluir_produto_valor)
 async def orc_editar_incluir_produto_valor_handler(message: types.Message, state: FSMContext):
     data = await state.get_data()
+    # se ainda não definimos qtd, esta mensagem é a qtd
     if data.get("editar_incluir_qtd") is None:
         try:
             qtd = parse_decimal(message.text)
@@ -768,6 +769,7 @@ async def orc_editar_incluir_produto_valor_handler(message: types.Message, state
         await message.answer("Agora digite o valor unitário (ex: 5.50):")
         return
 
+    # agora esta mensagem é o valor unitário
     try:
         valor = parse_decimal(message.text)
     except Exception:
@@ -776,18 +778,54 @@ async def orc_editar_incluir_produto_valor_handler(message: types.Message, state
     produto_label = data.get("editar_incluir_produto")
     qtd = data.get("editar_incluir_qtd", 1)
     orc_id = data.get("editar_orc_id")
+    lista_id = data.get("editar_incluir_lista_id")
+
     try:
         await adicionar_item_orc(orc_id, produto_label, qtd, valor)
     except Exception:
         traceback.print_exc()
         return await message.answer("Erro ao adicionar item. Tente novamente.")
-    await state.update_data(editar_incluir_produto=None, editar_incluir_qtd=None, editar_incluir_lista_id=None, editar_incluir_produtos_map=None)
-    itens = await listar_itens_orcamento(orc_id)
-    texto = "Itens do orçamento (atualizado):\n"
-    for it in itens:
+
+    # não limpar a lista_id — vamos reabrir a seleção para adicionar mais itens da mesma lista
+    # obter itens restantes da lista, excluindo os já adicionados no orçamento
+    itens_da_lista = await database.pegar_itens_da_lista(lista_id) if lista_id else []
+    existentes_rows = await listar_itens_orcamento(orc_id) if orc_id else []
+    existentes = { normalize_label(r.get("item_nome")) for r in existentes_rows }
+
+    btns = []
+    prod_map = {}
+    prod_map_norm = {}
+    for i in itens_da_lista:
+        label = build_product_label(i)
+        norm = normalize_label(label)
+        if norm in existentes:
+            continue
+        btns.append([KeyboardButton(text=label)])
+        prod_key = i.get("id") if isinstance(i, dict) else i
+        prod_map[label] = prod_key
+        prod_map_norm[norm] = prod_key
+
+    # preparar texto com itens do orçamento atualizado
+    itens_atualizados = await listar_itens_orcamento(orc_id)
+    texto = "Item adicionado ao orçamento.\n\nItens do orçamento (atualizado):\n"
+    for it in itens_atualizados:
         texto += f"• {build_orc_item_label(it)}\n"
-    await state.set_state(OrcState.editar_menu)
-    return await message.answer("Item adicionado ao orçamento.\n\n" + texto, reply_markup=ReplyKeyboardRemove())
+
+    if not btns:
+        # se não há mais itens disponíveis nesta lista, voltar ao menu de edição
+        await state.update_data(editar_incluir_produto=None, editar_incluir_qtd=None, editar_incluir_lista_id=None,
+                                editar_incluir_produtos_map=None, editar_incluir_produtos_map_norm=None)
+        await state.set_state(OrcState.editar_menu)
+        return await message.answer(texto + "\nTodos os itens desta lista já constam no orçamento.", reply_markup=ReplyKeyboardRemove())
+
+    # caso ainda existam itens, mostrar keyboard para selecionar próximo produto
+    btns.append([KeyboardButton(text="⬅️ Voltar")])
+    kb = ReplyKeyboardMarkup(keyboard=btns, resize_keyboard=True)
+    await state.update_data(editar_incluir_produtos_map=prod_map, editar_incluir_produtos_map_norm=prod_map_norm,
+                            editar_incluir_produto=None, editar_incluir_qtd=None)
+    # voltar para o estado que recebe a seleção do produto (mesma máquina de estados usada antes)
+    await state.set_state(OrcState.editar_incluir_produto_qtd)
+    return await message.answer(texto + "\nSelecione o próximo produto para incluir (ou ⬅️ Voltar):", reply_markup=kb)
 
 
 @router.message(OrcState.editar_excluir_selecionar_item)
