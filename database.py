@@ -98,7 +98,7 @@ async def init_db():
 async def listar_departamentos():
     conn = await get_conn()
     try:
-        rows = await conn.fetch("SELECT * FROM departamentos WHERE ativo = TRUE ORDER BY id")
+        rows = await conn.fetch("SELECT * FROM departamentos WHERE ativo = TRUE ORDER BY nome")
         return rows
     finally:
         await conn.close()
