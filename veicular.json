@@ -5,10 +5,10 @@
         "Óleo e Lubrificantes": {
           "essencial": true,
           "produtos": [
-            "Óleo 0W-20 sintético",
-            "Óleo 5W-30 sintético",
-            "Óleo 10W-40 semissintético",
-            "Óleo 15W-40 mineral",
+            "Óleo sintético",
+            "Óleo semissintético",
+            "Óleo mineral",
+            "Fluido de transmissão manual",
             "Fluido de transmissão (ATF)",
             "Graxa multiuso",
             "Aditivo de óleo (limpeza interna)"
@@ -49,11 +49,9 @@
       "Transmissão": {
         "Manual/Automática": {
           "produtos": [
-            "Embreagem (kit disco + platô + rolamento)",
+            "Kit Embreagem (kit disco + platô + rolamento)",
             "Cesto de embreagem",
-            "Kit de sincronizadores",
-            "Fluido de transmissão manual",
-            "Fluido de transmissão automática (ATF)"
+            "Kit de sincronizadores"
           ]
         },
         "Diferencial e Eixos": {
@@ -71,7 +69,8 @@
           "produtos": [
             "Pastilhas dianteiras",
             "Pastilhas traseiras",
-            "Discos de freio (par)",
+            "Discos de freio dianteiros (par)",
+            "Discos de freio traseiros (par)",
             "Pastilhas cerâmicas"
           ]
         },
@@ -130,8 +129,8 @@
         },
         "Rodas e Acessórios": {
           "produtos": [
-            "Roda de aço 15\"",
-            "Roda de liga leve 16\"",
+            "Roda de aço",
+            "Roda de liga leve",
             "Calota",
             "Válvula para pneu",
             "Sensor de pressão (TPMS)"
@@ -253,6 +252,19 @@
             "Vidro lateral",
             "Retrovisor elétrico",
             "Borracha de vedação"
+          ]
+        },
+        "Limpador de Para-brisa": {
+          "essencial": true,
+          "produtos": [
+            "Motor do limpador de para-brisa",
+            "Mecanismo/trem de engrenagens do limpador",
+            "Palhetas / lâminas do limpador",
+            "Braço do limpador",
+            "Relé / módulo do limpador",
+            "Bomba do reservatório do limpador",
+            "Reservatório de água do limpador",
+            "Chicote / conectores do limpador"
           ]
         }
       },
