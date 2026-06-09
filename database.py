@@ -550,10 +550,15 @@ async def listar_itens_historico(compra_id):
 async def importar_catalogo_para_departamento(dep_id: int, arquivo_json: str, catalogos_dir: str = "catalogos"):
     """
     Importa categorias e produtos a partir do JSON do catálogo.
-    Idempotente: usa ON CONFLICT / DO NOTHING para não duplicar registros.
-    - dep_id: id do departamento no DB
-    - arquivo_json: nome do arquivo (ex: 'vestuario.json')
-    - catalogos_dir: pasta onde estão os arquivos (default 'catalogos')
+    Suporta automaticamente tanto o formato antigo (top -> subcategoria -> produtos) quanto
+    o novo formato com 3 níveis (top -> categoria -> subcategoria -> produtos).
+
+    Normalizações e regras:
+    - Aceita 'subcategoria' ou 'subcategorias' como chaves.
+    - Aceita produtos como lista de strings ou lista de objetos com campo 'nome'/'name'.
+    - Cria categorias com o nome composto pelas partes do caminho separadas por " / ".
+    - Operações idempotentes: categorias e produtos usam ON CONFLICT para não duplicar.
+
     Retorna dict {'ok': bool, 'msg': str}
     """
     if not arquivo_json:
@@ -563,7 +568,6 @@ async def importar_catalogo_para_departamento(dep_id: int, arquivo_json: str, ca
     if not os.path.isfile(caminho):
         return {"ok": False, "msg": f"arquivo não encontrado: {caminho}"}
 
-    # carrega JSON
     try:
         with open(caminho, "r", encoding="utf-8") as f:
             data = json.load(f)
@@ -572,77 +576,121 @@ async def importar_catalogo_para_departamento(dep_id: int, arquivo_json: str, ca
 
     conn = await get_conn()
     try:
-        # itera top-level (ex: masculino, feminino, infantil, etc.)
-        for top_key, top_node in data.items():
-            # normalizar possibilidade de chaves 'subcategoria' / 'subcategorias' / 'produtos'
-            subcats = None
-            if isinstance(top_node, dict):
-                # procurar as variantes (você tem usado "subcategoria" ou "subcategorias")
-                subcats = top_node.get("subcategoria") or top_node.get("subcategorias")
-            # se houver subcategorias (estrutura: top -> subcategoria -> { produtos: [...] } )
-            if isinstance(subcats, dict):
-                for sub_name, sub_node in subcats.items():
-                    # nome da categoria no DB: "Top / Sub" (ex: "masculino / camisa")
-                    cat_nome = f"{top_key} / {sub_name}".strip()
-                    # insere/recupera categoria (idempotente)
-                    cat_id = await conn.fetchval(
-                        """
-                        INSERT INTO categorias (departamento_id, nome)
-                        VALUES ($1, $2)
-                        ON CONFLICT (departamento_id, nome) DO UPDATE
-                          SET nome = EXCLUDED.nome
-                        RETURNING id
-                        """,
-                        dep_id, cat_nome
-                    )
-                    # obter lista de produtos no sub_node
-                    produtos = []
-                    if isinstance(sub_node, dict):
-                        produtos = sub_node.get("produtos") or []
-                    elif isinstance(sub_node, list):
-                        produtos = sub_node
-                    # inserir produtos (idempotente)
-                    for p in produtos:
-                        if not p or not isinstance(p, str):
-                            continue
-                        await conn.execute(
-                            """
-                            INSERT INTO produtos (departamento_id, categoria_id, nome)
-                            VALUES ($1, $2, $3)
-                            ON CONFLICT (departamento_id, nome) DO NOTHING
-                            """,
-                            dep_id, cat_id, p.strip()
-                        )
+        async def _ensure_categoria(path_parts):
+            """Cria/retorna categoria cujo nome é a junção das partes por ' / '."""
+            nome = " / ".join([p.strip() for p in path_parts if p and str(p).strip()])
+            if not nome:
+                nome = "Sem categoria"
+            cat_id = await conn.fetchval(
+                """
+                INSERT INTO categorias (departamento_id, nome)
+                VALUES ($1, $2)
+                ON CONFLICT (departamento_id, nome) DO UPDATE
+                SET nome = EXCLUDED.nome
+                RETURNING id
+                """,
+                dep_id, nome
+            )
+            return cat_id
+
+        def _normalize_produtos(produtos_node):
+            """Retorna lista de nomes de produtos (strings) normalizados."""
+            items = []
+            if isinstance(produtos_node, list):
+                raw = produtos_node
+            elif isinstance(produtos_node, dict):
+                raw = produtos_node.get("produtos") or []
             else:
-                # nenhum subcategoria detectada: talvez top_node contenha 'produtos' diretamente
-                produtos = []
-                if isinstance(top_node, dict):
-                    produtos = top_node.get("produtos") or []
-                elif isinstance(top_node, list):
-                    produtos = top_node
-                if produtos:
-                    cat_nome = top_key.strip()
-                    cat_id = await conn.fetchval(
+                raw = []
+
+            for p in raw:
+                if isinstance(p, str):
+                    name = p.strip()
+                elif isinstance(p, dict):
+                    name = p.get("nome") or p.get("name") or ""
+                    if isinstance(name, str):
+                        name = name.strip()
+                else:
+                    continue
+                if name:
+                    items.append(name)
+            return items
+
+        async def _process_node(path_parts, node):
+            """Processa recursivamente o nó do JSON até encontrar listas de produtos.
+            Quando encontra 'produtos', insere a categoria (nome = caminho) e produtos.
+            """
+            # caso: node é lista direta de produtos
+            if isinstance(node, list):
+                produtos = _normalize_produtos(node)
+                if not produtos:
+                    return
+                cat_id = await _ensure_categoria(path_parts)
+                for prod in produtos:
+                    await conn.execute(
                         """
-                        INSERT INTO categorias (departamento_id, nome)
-                        VALUES ($1, $2)
-                        ON CONFLICT (departamento_id, nome) DO UPDATE
-                          SET nome = EXCLUDED.nome
-                        RETURNING id
+                        INSERT INTO produtos (departamento_id, categoria_id, nome)
+                        VALUES ($1, $2, $3)
+                        ON CONFLICT (departamento_id, nome) DO NOTHING
                         """,
-                        dep_id, cat_nome
+                        dep_id, cat_id, prod
                     )
-                    for p in produtos:
-                        if not p or not isinstance(p, str):
-                            continue
-                        await conn.execute(
-                            """
-                            INSERT INTO produtos (departamento_id, categoria_id, nome)
-                            VALUES ($1, $2, $3)
-                            ON CONFLICT (departamento_id, nome) DO NOTHING
-                            """,
-                            dep_id, cat_id, p.strip()
-                        )
+                return
+
+            # caso: node é dict
+            if isinstance(node, dict):
+                # caso comum: node contém chave 'produtos'
+                if "produtos" in node and isinstance(node.get("produtos"), list):
+                    produtos = _normalize_produtos(node)
+                    if produtos:
+                        cat_id = await _ensure_categoria(path_parts)
+                        for prod in produtos:
+                            await conn.execute(
+                                """
+                                INSERT INTO produtos (departamento_id, categoria_id, nome)
+                                VALUES ($1, $2, $3)
+                                ON CONFLICT (departamento_id, nome) DO NOTHING
+                                """,
+                                dep_id, cat_id, prod
+                            )
+                    return
+
+                # caso: node tem subcategorias em chaves conhecidas
+                subs = node.get("subcategoria") or node.get("subcategorias") or node.get("subcategories")
+                if isinstance(subs, dict):
+                    for k, v in subs.items():
+                        await _process_node(path_parts + [k], v)
+                    return
+
+                # heurística: se os valores do dict forem dicts ou listas, tratamos como níveis aninhados
+                nested = False
+                for k, v in node.items():
+                    if isinstance(v, (dict, list)):
+                        nested = True
+                        break
+                if nested:
+                    for k, v in node.items():
+                        await _process_node(path_parts + [k], v)
+                    return
+
+                # caso: dict sem produtos nem subcategorias -- nada a fazer
+                return
+
+            # caso contrário: nada a fazer
+            return
+
+        # percorre os nós top-level
+        for top_key, top_node in data.items():
+            if isinstance(top_node, dict):
+                subs = top_node.get("subcategoria") or top_node.get("subcategorias") or top_node.get("subcategories")
+                if isinstance(subs, dict):
+                    # padrão: top -> categoria -> subcategoria -> produtos
+                    for cat_name, cat_node in subs.items():
+                        await _process_node([top_key, cat_name], cat_node)
+                    continue
+            # fallback: processa top_node diretamente (top_key como categoria)
+            await _process_node([top_key], top_node)
+
         return {"ok": True, "msg": "import completo"}
     finally:
         await conn.close()

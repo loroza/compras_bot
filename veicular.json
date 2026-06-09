@@ -1,0 +1,496 @@
+{
+  "pecas": {
+    "subcategorias": {
+      "Motor": {
+        "Óleo e Lubrificantes": {
+          "essencial": true,
+          "produtos": [
+            "Óleo 0W-20 sintético",
+            "Óleo 5W-30 sintético",
+            "Óleo 10W-40 semissintético",
+            "Óleo 15W-40 mineral",
+            "Fluido de transmissão (ATF)",
+            "Graxa multiuso",
+            "Aditivo de óleo (limpeza interna)"
+          ]
+        },
+        "Filtros": {
+          "essencial": true,
+          "produtos": [
+            "Filtro de óleo",
+            "Filtro de ar do motor",
+            "Filtro de combustível"
+          ]
+        },
+        "Velas e Ignição": {
+          "produtos": [
+            "Velas de ignição (jogo)",
+            "Bobina de ignição",
+            "Cabos de vela"
+          ]
+        },
+        "Correias e Tensores": {
+          "produtos": [
+            "Correia dentada (kit)",
+            "Correia alternador",
+            "Tensionador",
+            "Polia do alternador"
+          ]
+        },
+        "Cabeçote e Componentes": {
+          "produtos": [
+            "Junta de cabeçote",
+            "Válvula",
+            "Retentor de válvula",
+            "Comando de válvulas"
+          ]
+        }
+      },
+      "Transmissão": {
+        "Manual/Automática": {
+          "produtos": [
+            "Embreagem (kit disco + platô + rolamento)",
+            "Cesto de embreagem",
+            "Kit de sincronizadores",
+            "Fluido de transmissão manual",
+            "Fluido de transmissão automática (ATF)"
+          ]
+        },
+        "Diferencial e Eixos": {
+          "produtos": [
+            "Junta homocinética",
+            "Semi-eixo",
+            "Rolamento de diferencial",
+            "Óleo de diferencial"
+          ]
+        }
+      },
+      "Freios": {
+        "Pastilhas e Discos": {
+          "essencial": true,
+          "produtos": [
+            "Pastilhas dianteiras",
+            "Pastilhas traseiras",
+            "Discos de freio (par)",
+            "Pastilhas cerâmicas"
+          ]
+        },
+        "Fluido e Componentes": {
+          "essencial": true,
+          "produtos": [
+            "Fluido de freio DOT3",
+            "Fluido de freio DOT4",
+            "Cilindro mestre",
+            "Pinça de freio",
+            "Mangueira de freio"
+          ]
+        },
+        "Tambor e Sapata": {
+          "produtos": [
+            "Sapata de freio",
+            "Tambores de freio"
+          ]
+        }
+      },
+      "Suspensão e Direção": {
+        "Amortecedores e Molas": {
+          "essencial": true,
+          "produtos": [
+            "Amortecedor dianteiro",
+            "Amortecedor traseiro",
+            "Mola helicoidal",
+            "Batente de suspensão"
+          ]
+        },
+        "Componentes da Direção": {
+          "produtos": [
+            "Terminais de direção",
+            "Caixa de direção",
+            "Bomba de direção hidráulica",
+            "Braço de direção"
+          ]
+        },
+        "Buchas e Coxins": {
+          "produtos": [
+            "Bucha de bandeja",
+            "Coxim de suspensão",
+            "Buchas da barra estabilizadora"
+          ]
+        }
+      },
+      "Rodas e Pneus": {
+        "Pneus": {
+          "produtos": [
+            "Pneu 175/65 R14",
+            "Pneu 195/55 R16",
+            "Pneu 205/55 R16",
+            "Pneu 225/45 R17",
+            "Pneu reforçado para carga"
+          ]
+        },
+        "Rodas e Acessórios": {
+          "produtos": [
+            "Roda de aço 15\"",
+            "Roda de liga leve 16\"",
+            "Calota",
+            "Válvula para pneu",
+            "Sensor de pressão (TPMS)"
+          ]
+        },
+        "Serviços de Pneus": {
+          "produtos": [
+            "Balanceamento",
+            "Alinhamento",
+            "Reparo de pneu (plug)",
+            "Troca de pneu (montagem/desmontagem)"
+          ]
+        }
+      },
+      "Sistema Elétrico e Iluminação": {
+        "Baterias e Carregamento": {
+          "essencial": true,
+          "produtos": [
+            "Bateria 45Ah",
+            "Bateria 60Ah",
+            "Alternador",
+            "Motor de partida",
+            "Carregador de bateria"
+          ]
+        },
+        "Iluminação": {
+          "produtos": [
+            "Lâmpada farol H4",
+            "Lâmpada farol H7",
+            "Lâmpada LED DRL",
+            "Farol completo",
+            "Lanterna traseira",
+            "Lâmpada de ré"
+          ]
+        },
+        "Fiação e Sensores": {
+          "produtos": [
+            "Fiação do painel",
+            "Sensor de rotação",
+            "Sensor de temperatura",
+            "Módulo de injeção (ECU)"
+          ]
+        }
+      },
+      "Injeção e Combustível": {
+        "Bomba e Injetores": {
+          "essencial": true,
+          "produtos": [
+            "Bomba de combustível",
+            "Injetor de combustível",
+            "Regulador de pressão",
+            "Sensor MAP"
+          ]
+        },
+        "Filtros e Mangueiras": {
+          "produtos": [
+            "Filtro de combustível",
+            "Tubo de combustível",
+            "Mangueira combustível"
+          ]
+        }
+      },
+      "Arrefecimento": {
+        "Radiador e Circulação": {
+          "produtos": [
+            "Radiador",
+            "Bomba d'água",
+            "Termostato",
+            "Mangueiras de água",
+            "Reservatório de expansão"
+          ]
+        },
+        "Fluidos": {
+          "produtos": [
+            "Líquido de arrefecimento / anticongelante",
+            "Aditivo de arrefecimento"
+          ]
+        }
+      },
+      "Escape": {
+        "Silenciosos e Catalisador": {
+          "produtos": [
+            "Silencioso traseiro",
+            "Catalisador",
+            "Coletor de escape",
+            "Sensor de oxigênio (O2)"
+          ]
+        },
+        "Tubulação e Fixadores": {
+          "produtos": [
+            "Tubos de escape",
+            "Abraçadeiras",
+            "Suportes e hangers"
+          ]
+        }
+      },
+      "Embreagem e Acoplamento": {
+        "Kit de Embreagem": {
+          "produtos": [
+            "Disco de embreagem",
+            "Platô (capa)",
+            "Rolamento de embreagem",
+            "Cabo de embreagem"
+          ]
+        }
+      },
+      "Carroceria e Vidros": {
+        "Peças Externas": {
+          "produtos": [
+            "Para-choque dianteiro",
+            "Para-choque traseiro",
+            "Capô",
+            "Porta"
+          ]
+        },
+        "Vidros e Borrachas": {
+          "produtos": [
+            "Parabrisa",
+            "Vidro lateral",
+            "Retrovisor elétrico",
+            "Borracha de vedação"
+          ]
+        }
+      },
+      "Acessórios e Conforto": {
+        "Internos": {
+          "produtos": [
+            "Tapetes",
+            "Capa de banco",
+            "Aparelho de som / multimídia",
+            "Suporte para celular"
+          ]
+        },
+        "Externos": {
+          "produtos": [
+            "Rack de teto",
+            "Engate de reboque",
+            "Sensor de estacionamento"
+          ]
+        }
+      },
+      "Segurança": {
+        "Airbags e Cintos": {
+          "essencial": true,
+          "produtos": [
+            "Airbag frontal (unidade)",
+            "Sensor de airbag",
+            "Cinto de segurança (reparo/instalação)"
+          ]
+        },
+        "Alarme e Imobilizador": {
+          "produtos": [
+            "Alarme automotivo",
+            "Imobilizador",
+            "Chave com telecomando"
+          ]
+        }
+      },
+      "Lubrificantes e Fluídos": {
+        "Fluidos Específicos": {
+          "produtos": [
+            "Fluido de freio",
+            "Fluido de direção hidráulica",
+            "Fluido de transmissão",
+            "Óleo para caixa de transferência (4x4)"
+          ]
+        }
+      },
+      "Peças de Reposição Diversas": {
+        "Peças Gerais": {
+          "produtos": [
+            "Parafuso/porca diversos",
+            "Abraçadeira metálica",
+            "Junta/retentor",
+            "Sensor diversos (temperatura, pressão)"
+          ]
+        }
+      }
+    }
+  },
+  "abastecimento": {
+    "subcategorias": {
+      "Combustível": {
+        "Combustíveis": {
+          "essencial": true,
+          "produtos": [
+            "Gasolina comum",
+            "Gasolina aditivada",
+            "Gasolina premium",
+            "Etanol (álcool)",
+            "Diesel S-500",
+            "Diesel S-10",
+            "Gás Natural Veicular (GNV)"
+          ]
+        },
+        "Aditivos e Tratamentos": {
+          "produtos": [
+            "Aditivo de limpeza de bicos",
+            "Aditivo para aumento de octanagem",
+            "Aditivo para redução de emissões",
+            "Aditivo descarbonizante"
+          ]
+        },
+        "Abastecimento e Bombas": {
+          "produtos": [
+            "Bomba de transferência de combustível",
+            "Bico de abastecimento (bomba)",
+            "Filtro de combustível"
+          ]
+        }
+      },
+      "Gás e GLP": {
+        "Conversão e Peças": {
+          "produtos": [
+            "Kit de conversão GNV",
+            "Regulador de pressão GNV",
+            "Cilindro GNV"
+          ]
+        }
+      },
+      "Lubrificação e Óleos": {
+        "produtos": [
+          "Óleo de motor (var. viscosidade)",
+          "Óleo de transmissão",
+          "Óleo hidráulico"
+        ]
+      }
+    }
+  },
+  "servicos": {
+    "subcategorias": {
+      "Manutenção Preventiva": {
+        "Troca de Óleo e Filtros": {
+          "essencial": true,
+          "produtos": [
+            "Troca de óleo completa (mão de obra)",
+            "Substituição filtro de óleo",
+            "Substituição filtro de ar",
+            "Substituição filtro de cabine"
+          ]
+        },
+        "Revisões Periódicas": {
+          "produtos": [
+            "Revisão 10.000 km",
+            "Revisão 20.000 km",
+            "Revisão 30.000 km",
+            "Checklist de inspeção completa"
+          ]
+        },
+        "Inspeção e Diagnóstico": {
+          "produtos": [
+            "Diagnóstico eletrônico (scanner/ECU)",
+            "Teste de bateria e carga",
+            "Teste de compressão do motor"
+          ]
+        }
+      },
+      "Freios e Segurança": {
+        "Serviços de Freio": {
+          "essencial": true,
+          "produtos": [
+            "Substituição de pastilhas",
+            "Retificação/ Substituição de discos",
+            "Sangria do sistema de freio",
+            "Reparo de pinça de freio"
+          ]
+        }
+      },
+      "Suspensão e Direção": {
+        "Alinhamento e Balanceamento": {
+          "produtos": [
+            "Alinhamento 3D",
+            "Balanceamento de rodas",
+            "Substituição de amortecedores"
+          ]
+        },
+        "Reparos de Suspensão": {
+          "produtos": [
+            "Troca de buchas",
+            "Troca de braços",
+            "Instalação de coxins"
+          ]
+        }
+      },
+      "Transmissão e Embreagem": {
+        "Serviços de Embreagem": {
+          "produtos": [
+            "Troca de kit de embreagem",
+            "Regulação de cabo de embreagem",
+            "Reparo de caixa de marcha"
+          ]
+        },
+        "Serviços de Câmbio Automático": {
+          "produtos": [
+            "Troca de fluido ATF",
+            "Reprogramação/serviço de módulo",
+            "Reparo de conversor de torque"
+          ]
+        }
+      },
+      "Pneus e Rodas": {
+        "Serviços": {
+          "produtos": [
+            "Montagem e desmontagem de pneus",
+            "Recape/Remolding",
+            "Reparo de roda",
+            "Troca de válvula (TPMS)"
+          ]
+        }
+      },
+      "Ar Condicionado": {
+        "Manutenção AC": {
+          "produtos": [
+            "Recarga de gás R134a / R1234yf",
+            "Limpeza e higienização do sistema",
+            "Substituição de compressor",
+            "Substituição de filtro cabine (pólen)"
+          ]
+        }
+      },
+      "Elétrica e Eletrônica": {
+        "Serviços Elétricos": {
+          "produtos": [
+            "Substituição de alternador",
+            "Substituição de motor de partida",
+            "Reparos em chicotes",
+            "Atualização/instalação de central multimídia"
+          ]
+        }
+      },
+      "Carroceria e Pintura": {
+        "Pequenos Reparos": {
+          "produtos": [
+            "Martelinho de ouro (remoção de amassados)",
+            "Pintura local",
+            "Repintura completa",
+            "Polimento e vitrificação"
+          ]
+        }
+      },
+      "Serviços Especiais": {
+        "Serviços": {
+          "produtos": [
+            "Troca de correia dentada (serviço completo)",
+            "Retífica de motor",
+            "Balanceamento de motor (bancada)",
+            "Recuperação de cabeçote"
+          ]
+        }
+      },
+      "Pacotes e Ofertas": {
+        "Kits de Serviço": {
+          "produtos": [
+            "Pacote Básico (troca óleo + filtros + checklist)",
+            "Pacote Premium (inspeção + fluidos + 30 itens)",
+            "Pacote Viagem (verificação suspensão, freios, pneus)"
+          ]
+        }
+      }
+    }
+  }
+}
