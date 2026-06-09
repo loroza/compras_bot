@@ -1,6 +1,7 @@
 import asyncpg
 import os
 from dotenv import load_dotenv
+import json
 
 load_dotenv()
 DATABASE_URL = os.getenv("DATABASE_URL")
@@ -542,3 +543,137 @@ async def listar_itens_historico(compra_id):
         return rows
     finally:
         await conn.close()
+
+
+# --- IMPORTAÇÃO DE CATÁLOGO JSON PARA DB ---
+
+async def importar_catalogo_para_departamento(dep_id: int, arquivo_json: str, catalogos_dir: str = "catalogos"):
+    """
+    Importa categorias e produtos a partir do JSON do catálogo.
+    Idempotente: usa ON CONFLICT / DO NOTHING para não duplicar registros.
+    - dep_id: id do departamento no DB
+    - arquivo_json: nome do arquivo (ex: 'vestuario.json')
+    - catalogos_dir: pasta onde estão os arquivos (default 'catalogos')
+    Retorna dict {'ok': bool, 'msg': str}
+    """
+    if not arquivo_json:
+        return {"ok": False, "msg": "arquivo_json vazio"}
+
+    caminho = os.path.join(catalogos_dir, arquivo_json)
+    if not os.path.isfile(caminho):
+        return {"ok": False, "msg": f"arquivo não encontrado: {caminho}"}
+
+    # carrega JSON
+    try:
+        with open(caminho, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except Exception as e:
+        return {"ok": False, "msg": f"erro ao ler JSON: {e}"}
+
+    conn = await get_conn()
+    try:
+        # itera top-level (ex: masculino, feminino, infantil, etc.)
+        for top_key, top_node in data.items():
+            # normalizar possibilidade de chaves 'subcategoria' / 'subcategorias' / 'produtos'
+            subcats = None
+            if isinstance(top_node, dict):
+                # procurar as variantes (você tem usado "subcategoria" ou "subcategorias")
+                subcats = top_node.get("subcategoria") or top_node.get("subcategorias")
+            # se houver subcategorias (estrutura: top -> subcategoria -> { produtos: [...] } )
+            if isinstance(subcats, dict):
+                for sub_name, sub_node in subcats.items():
+                    # nome da categoria no DB: "Top / Sub" (ex: "masculino / camisa")
+                    cat_nome = f"{top_key} / {sub_name}".strip()
+                    # insere/recupera categoria (idempotente)
+                    cat_id = await conn.fetchval(
+                        """
+                        INSERT INTO categorias (departamento_id, nome)
+                        VALUES ($1, $2)
+                        ON CONFLICT (departamento_id, nome) DO UPDATE
+                          SET nome = EXCLUDED.nome
+                        RETURNING id
+                        """,
+                        dep_id, cat_nome
+                    )
+                    # obter lista de produtos no sub_node
+                    produtos = []
+                    if isinstance(sub_node, dict):
+                        produtos = sub_node.get("produtos") or []
+                    elif isinstance(sub_node, list):
+                        produtos = sub_node
+                    # inserir produtos (idempotente)
+                    for p in produtos:
+                        if not p or not isinstance(p, str):
+                            continue
+                        await conn.execute(
+                            """
+                            INSERT INTO produtos (departamento_id, categoria_id, nome)
+                            VALUES ($1, $2, $3)
+                            ON CONFLICT (departamento_id, nome) DO NOTHING
+                            """,
+                            dep_id, cat_id, p.strip()
+                        )
+            else:
+                # nenhum subcategoria detectada: talvez top_node contenha 'produtos' diretamente
+                produtos = []
+                if isinstance(top_node, dict):
+                    produtos = top_node.get("produtos") or []
+                elif isinstance(top_node, list):
+                    produtos = top_node
+                if produtos:
+                    cat_nome = top_key.strip()
+                    cat_id = await conn.fetchval(
+                        """
+                        INSERT INTO categorias (departamento_id, nome)
+                        VALUES ($1, $2)
+                        ON CONFLICT (departamento_id, nome) DO UPDATE
+                          SET nome = EXCLUDED.nome
+                        RETURNING id
+                        """,
+                        dep_id, cat_nome
+                    )
+                    for p in produtos:
+                        if not p or not isinstance(p, str):
+                            continue
+                        await conn.execute(
+                            """
+                            INSERT INTO produtos (departamento_id, categoria_id, nome)
+                            VALUES ($1, $2, $3)
+                            ON CONFLICT (departamento_id, nome) DO NOTHING
+                            """,
+                            dep_id, cat_id, p.strip()
+                        )
+        return {"ok": True, "msg": "import completo"}
+    finally:
+        await conn.close()
+
+
+async def criar_departamento(nome: str, emoji: str = "📦", catalogo_json: str = None):
+    """
+    Cria um departamento e, se 'catalogo_json' for fornecido, importa categorias/produtos automaticamente.
+    Retorna dict com 'ok' e 'id' ou 'msg'.
+    """
+    conn = await get_conn()
+    try:
+        dep_id = await conn.fetchval(
+            """
+            INSERT INTO departamentos (nome, emoji, catalogo_json)
+            VALUES ($1, $2, $3)
+            ON CONFLICT (nome) DO UPDATE
+              SET emoji = EXCLUDED.emoji, catalogo_json = COALESCE(EXCLUDED.catalogo_json, departamentos.catalogo_json)
+            RETURNING id
+            """,
+            nome, emoji, catalogo_json
+        )
+    finally:
+        await conn.close()
+
+    # se tiver catalogo_json, tenta importar (não crítica: loga erro e continua)
+    if catalogo_json:
+        try:
+            await importar_catalogo_para_departamento(dep_id, catalogo_json)
+        except Exception as e:
+            # opcional: logar
+            print(f"[WARN] falha ao importar catálogo para departamento {nome}: {e}")
+            # não falhar a criação por causa da import
+    return {"ok": True, "id": dep_id}
