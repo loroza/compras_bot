@@ -95,6 +95,83 @@ def parse_decimal(text: str) -> float:
     return float(s)
 
 
+# --- Helpers para labels (tolerantes) ---
+def build_product_label(prod):
+    """
+    Gera label no formato:
+    Categoria > Subcategoria > Produto — Unidade — R$X.XX
+    Aceita:
+      - prod: dict com keys 'categoria', 'subcategoria', 'nome'/'produto_nome'/'item_nome', 'unidade', 'valor_unitario'
+      - prod: string -> retorna a string
+    """
+    if isinstance(prod, str):
+        return prod
+    # tentar múltiplas chaves possíveis para nome
+    nome = prod.get("nome") or prod.get("produto_nome") or prod.get("item_nome") or prod.get("nome_produto") or ""
+    categoria = prod.get("categoria") or prod.get("cat") or ""
+    sub = prod.get("subcategoria") or prod.get("sub") or ""
+    unidade = prod.get("unidade") or prod.get("un") or ""
+    valor = prod.get("valor_unitario")
+    valor_num = 0.0
+    try:
+        if valor is not None:
+            valor_num = float(valor)
+    except Exception:
+        valor_num = 0.0
+
+    parts = []
+    if categoria:
+        parts.append(categoria)
+    if sub:
+        parts.append(sub)
+    if nome:
+        parts.append(nome)
+    label = " > ".join(parts) if parts else nome or str(prod)
+    if unidade:
+        label = f"{label} — {unidade}"
+    label = f"{label} — R${valor_num:.2f}"
+    return label
+
+
+def build_orc_item_label(item_row):
+    """
+    Gera label para itens já adicionados ao orçamento:
+    Categoria > Subcategoria > Produto — Unidade — R$X.XX
+    Fallback: ID:XX | produto — R$X.XX
+    """
+    # item_row pode ser dict com keys item_nome, categoria, subcategoria, unidade, valor_unitario, id
+    try:
+        nome = item_row.get("item_nome") or item_row.get("nome") or ""
+        categoria = item_row.get("categoria") or ""
+        sub = item_row.get("subcategoria") or ""
+        unidade = item_row.get("unidade") or ""
+        valor = item_row.get("valor_unitario") or 0.0
+        id_ = item_row.get("id")
+        # montar partes
+        parts = []
+        if categoria:
+            parts.append(categoria)
+        if sub:
+            parts.append(sub)
+        if nome:
+            parts.append(nome)
+        label_main = " > ".join(parts) if parts else nome or ""
+        if unidade:
+            label_main = f"{label_main} — {unidade}"
+        label = f"{label_main} — R${float(valor):.2f}"
+        if id_ is not None:
+            label = f"ID:{id_} | {label}"
+        return label
+    except Exception:
+        # fallback simples
+        id_ = item_row.get("id") if isinstance(item_row, dict) else None
+        nome = item_row.get("item_nome") if isinstance(item_row, dict) else str(item_row)
+        valor = item_row.get("valor_unitario") if isinstance(item_row, dict) else 0.0
+        if id_:
+            return f"ID:{id_} | {nome} — R${float(valor):.2f}"
+        return f"{nome} — R${float(valor):.2f}"
+
+
 # --- DB: garante tabelas/colunas necessárias (idempotente) ---
 async def ensure_tables():
     conn = await database.get_conn()
@@ -187,6 +264,7 @@ async def listar_itens_orcamento(orc_id):
             """,
             orc_id
         )
+        # rows podem conter colunas extras (categoria, subcategoria, unidade) dependendo do schema
         return rows
     finally:
         await conn.close()
@@ -350,12 +428,24 @@ async def orc_novo_selecionar_lista_handler(message: types.Message, state: FSMCo
     itens = await database.pegar_itens_da_lista(lista_id)
     if not itens:
         return await message.answer("A lista selecionada não contém itens. Use outra lista ou adicione itens.", reply_markup=kb_voltar())
-    # montar keyboard de produtos
-    btns = [[KeyboardButton(text=i)] for i in itens]
+    # montar keyboard de produtos (formato hierárquico se possível)
+    btns = []
+    prod_map = {}
+    for i in itens:
+        label = build_product_label(i)
+        btns.append([KeyboardButton(text=label)])
+        # mapa guarda, preferindo um id quando existir
+        prod_key = None
+        if isinstance(i, dict):
+            prod_key = i.get("id") or i.get("produto_id") or i.get("produto") or i.get("nome") or i.get("item_nome")
+        else:
+            prod_key = i
+        prod_map[label] = prod_key
     btns.append([KeyboardButton(text="⬅️ Voltar")])
     kb = ReplyKeyboardMarkup(keyboard=btns, resize_keyboard=True)
     await state.set_state(OrcState.novo_selecionar_produto)
-    await message.answer("Selecione um produto da lista para adicionar ao orçamento:", reply_markup=kb)
+    await state.update_data(novo_produtos_map=prod_map)
+    await message.answer("Selecione um produto da lista para adicionar ao orçamento (categoria > subcategoria > produto > unidade > valor):", reply_markup=kb)
 
 
 @router.message(OrcState.novo_selecionar_produto)
@@ -363,11 +453,17 @@ async def orc_novo_produto_handler(message: types.Message, state: FSMContext):
     if message.text == "⬅️ Voltar":
         await state.set_state(OrcState.novo_selecionar_lista)
         return await orc_novo_listas_prompt(message, state)
-    produto = message.text.strip()
-    # armazenar produto temporário e pedir quantidade
-    await state.update_data(novo_produto=produto)
+    data = await state.get_data()
+    prod_map = data.get("novo_produtos_map", {})
+    chave = message.text.strip()
+    produto_key = prod_map.get(chave)
+    if not produto_key:
+        # se não encontrou por mapa, tentar aceitar texto simples (compatibilidade)
+        produto_key = chave
+    # armazenar produto temporário (armazenamos o label para preservar info exibida)
+    await state.update_data(novo_produto_label=chave, novo_produto=produto_key)
     await state.set_state(OrcState.novo_qtd)
-    await message.answer(f"Quantidade para {produto} (ex: 1, 1.5, 2):", reply_markup=ReplyKeyboardRemove())
+    await message.answer(f"Quantidade para {chave} (ex: 1, 1.5, 2):", reply_markup=ReplyKeyboardRemove())
 
 
 @router.message(OrcState.novo_qtd)
@@ -388,14 +484,15 @@ async def orc_novo_valor_handler(message: types.Message, state: FSMContext):
     except Exception:
         return await message.answer("Valor inválido. Digite um número válido.")
     data = await state.get_data()
-    produto = data.get("novo_produto")
+    produto_label = data.get("novo_produto_label") or data.get("novo_produto")
     lista_itens = data.get("novo_itens", [])
-    lista_itens.append({"item_nome": produto, "quantidade": data.get("novo_qtd", 1), "valor_unitario": valor})
+    # Guardar item com item_nome proveniente do label (compatível com DB existente)
+    lista_itens.append({"item_nome": produto_label, "quantidade": data.get("novo_qtd", 1), "valor_unitario": valor})
     await state.update_data(novo_itens=lista_itens)
     # oferecer adicionar mais ou finalizar
     await state.set_state(OrcState.novo_confirmar)
     texto = "Item adicionado:\n"
-    texto += f"• {produto} — {data.get('novo_qtd', 1)} x R${valor:.2f}\n\n"
+    texto += f"• {produto_label} — {data.get('novo_qtd', 1)} x R${valor:.2f}\n\n"
     texto += f"Itens até agora: {len(lista_itens)}\n"
     await message.answer(texto, reply_markup=kb_confirmar_cancelar())
 
@@ -411,10 +508,19 @@ async def orc_novo_confirmar_handler(message: types.Message, state: FSMContext):
         data = await state.get_data()
         lista_id = data.get("novo_lista_id")
         itens = await database.pegar_itens_da_lista(lista_id)
-        btns = [[KeyboardButton(text=i)] for i in itens]
+        if not itens:
+            return await message.answer("Lista vazia.")
+        btns = []
+        prod_map = {}
+        for i in itens:
+            label = build_product_label(i)
+            btns.append([KeyboardButton(text=label)])
+            prod_key = i.get("id") if isinstance(i, dict) else i
+            prod_map[label] = prod_key
         btns.append([KeyboardButton(text="⬅️ Voltar")])
         kb = ReplyKeyboardMarkup(keyboard=btns, resize_keyboard=True)
         await state.set_state(OrcState.novo_selecionar_produto)
+        await state.update_data(novo_produtos_map=prod_map)
         return await message.answer("Selecione produto:", reply_markup=kb)
 
     # Finalizar
@@ -512,7 +618,11 @@ async def orc_editar_menu_handler(message: types.Message, state: FSMContext):
         listas = await database.pegar_listas_disponiveis(dep_id)
         if not listas:
             return await message.answer("Nenhuma lista disponível para selecionar.")
-        btns = [[KeyboardButton(text=l["nome"])] for l in listas]
+        btns = []
+        prod_map = {}
+        for l in listas:
+            # sempre mostrar as listas para o usuário escolher primeiro
+            btns.append([KeyboardButton(text=l["nome"])])
         btns.append([KeyboardButton(text="⬅️ Voltar")])
         kb = ReplyKeyboardMarkup(keyboard=btns, resize_keyboard=True)
         await state.set_state(OrcState.editar_incluir_produto)
@@ -526,15 +636,14 @@ async def orc_editar_menu_handler(message: types.Message, state: FSMContext):
         btns = []
         excluir_map = {}
         for i in itens:
-            valor = float(i["valor_unitario"]) if i.get("valor_unitario") is not None else 0.0
-            label = f"ID:{i['id']} | {i['item_nome']} | R${valor:.2f}"
+            label = build_orc_item_label(i)
             btns.append([KeyboardButton(text=label)])
             excluir_map[label] = i["id"]
         btns.append([KeyboardButton(text="⬅️ Voltar")])
         kb = ReplyKeyboardMarkup(keyboard=btns, resize_keyboard=True)
         await state.set_state(OrcState.editar_excluir_selecionar_item)
         await state.update_data(editar_excluir_map=excluir_map)
-        return await message.answer("Selecione o item para excluir:", reply_markup=kb)
+        return await message.answer("Selecione o produto cadastrado no orçamento para excluir (categoria > subcategoria > produto > unidade > valor):", reply_markup=kb)
 
     if text == "✏️ Editar item":
         itens = await listar_itens_orcamento(orc_id)
@@ -543,15 +652,14 @@ async def orc_editar_menu_handler(message: types.Message, state: FSMContext):
         btns = []
         editar_map = {}
         for i in itens:
-            valor = float(i["valor_unitario"]) if i.get("valor_unitario") is not None else 0.0
-            label = f"ID:{i['id']} | {i['item_nome']} | R${valor:.2f}"
+            label = build_orc_item_label(i)
             btns.append([KeyboardButton(text=label)])
             editar_map[label] = i["id"]
         btns.append([KeyboardButton(text="⬅️ Voltar")])
         kb = ReplyKeyboardMarkup(keyboard=btns, resize_keyboard=True)
         await state.set_state(OrcState.editar_editar_selecionar_item)
         await state.update_data(editar_editar_map=editar_map)
-        return await message.answer("Selecione o item para editar:", reply_markup=kb)
+        return await message.answer("Selecione o produto cadastrado no orçamento para editar (categoria > subcategoria > produto > unidade > valor):", reply_markup=kb)
 
     return await message.answer("Escolha válida: use os botões.")
 
@@ -570,12 +678,18 @@ async def orc_editar_incluir_produto_handler(message: types.Message, state: FSMC
     itens = await database.pegar_itens_da_lista(lista_id)
     if not itens:
         return await message.answer("Lista vazia.")
-    btns = [[KeyboardButton(text=i)] for i in itens]
+    btns = []
+    prod_map = {}
+    for i in itens:
+        label = build_product_label(i)
+        btns.append([KeyboardButton(text=label)])
+        prod_key = i.get("id") if isinstance(i, dict) else i
+        prod_map[label] = prod_key
     btns.append([KeyboardButton(text="⬅️ Voltar")])
     kb = ReplyKeyboardMarkup(keyboard=btns, resize_keyboard=True)
-    await state.update_data(editar_incluir_lista_id=lista_id)
+    await state.update_data(editar_incluir_lista_id=lista_id, editar_incluir_produtos_map=prod_map)
     await state.set_state(OrcState.editar_incluir_produto_qtd)
-    await message.answer("Selecione o produto para incluir (após selecionar será pedido quantidade):", reply_markup=kb)
+    await message.answer("Selecione o produto para incluir (categoria > subcategoria > produto > unidade > valor):", reply_markup=kb)
 
 
 @router.message(OrcState.editar_incluir_produto_qtd)
@@ -583,17 +697,30 @@ async def orc_editar_incluir_produto_qtd_handler(message: types.Message, state: 
     if message.text == "⬅️ Voltar":
         await state.set_state(OrcState.editar_menu)
         return await message.answer("Voltando ao menu de edição.")
-    produto = message.text.strip()
-    await state.update_data(editar_incluir_produto=produto)
+    # o texto pode ser o label do produto
+    data = await state.get_data()
+    prod_map = data.get("editar_incluir_produtos_map", {})
+    chosen_label = message.text.strip()
+    prod_key = prod_map.get(chosen_label)
+    # se o usuário está respondendo quantidade em vez do produto, detectar e aceitar
+    if prod_key is None:
+        # considerar que foi escolhido um produto anteriormente (estado deveria ter sido salvo)
+        # para simplicidade, aceitar o texto como produto label mesmo
+        await state.update_data(editar_incluir_produto=chosen_label, editar_incluir_qtd=None)
+        await state.set_state(OrcState.editar_incluir_produto_valor)
+        return await message.answer(f"Quantidade para {chosen_label}:", reply_markup=ReplyKeyboardRemove())
+
+    # se chegou aqui, o usuário clicou no produto -> pedir quantidade
+    await state.update_data(editar_incluir_produto=chosen_label, editar_incluir_qtd=None)
     await state.set_state(OrcState.editar_incluir_produto_valor)
-    await message.answer(f"Quantidade para {produto}:", reply_markup=ReplyKeyboardRemove())
+    await message.answer(f"Quantidade para {chosen_label}:", reply_markup=ReplyKeyboardRemove())
 
 
 @router.message(OrcState.editar_incluir_produto_valor)
 async def orc_editar_incluir_produto_valor_handler(message: types.Message, state: FSMContext):
     # primeiro recebemos quantidade (se for numérico) ou tratamos se usuário enviar valor primeiro por engano
     data = await state.get_data()
-    if "editar_incluir_qtd" not in data:
+    if data.get("editar_incluir_qtd") is None:
         # esperamos quantidade
         try:
             qtd = parse_decimal(message.text)
@@ -609,18 +736,25 @@ async def orc_editar_incluir_produto_valor_handler(message: types.Message, state
     except Exception:
         return await message.answer("Valor inválido. Digite novamente.")
     data = await state.get_data()
-    produto = data.get("editar_incluir_produto")
+    produto_label = data.get("editar_incluir_produto")
     qtd = data.get("editar_incluir_qtd", 1)
     orc_id = data.get("editar_orc_id")
     try:
-        await adicionar_item_orc(orc_id, produto, qtd, valor)
+        await adicionar_item_orc(orc_id, produto_label, qtd, valor)
     except Exception:
         traceback.print_exc()
         return await message.answer("Erro ao adicionar item. Tente novamente.")
     # limpar campos temporários relacionados à inclusão
-    await state.update_data(editar_incluir_produto=None, editar_incluir_qtd=None, editar_incluir_lista_id=None)
+    await state.update_data(editar_incluir_produto=None, editar_incluir_qtd=None, editar_incluir_lista_id=None, editar_incluir_produtos_map=None)
+    # após incluir, mostrar itens atualizados (conforme fluxograma, mostrar itens novamente)
+    itens = await listar_itens_orcamento(orc_id)
+    texto = "Itens do orçamento (atualizado):\n"
+    for it in itens:
+        q = it.get("quantidade") or 0
+        v = it.get("valor_unitario") or 0
+        texto += f"• {build_orc_item_label(it)}\n"
     await state.set_state(OrcState.editar_menu)
-    return await message.answer(f"Item {produto} adicionado ao orçamento.", reply_markup=ReplyKeyboardRemove())
+    return await message.answer("Item adicionado ao orçamento.\n\n" + texto, reply_markup=ReplyKeyboardRemove())
 
 
 @router.message(OrcState.editar_excluir_selecionar_item)
@@ -654,8 +788,13 @@ async def orc_editar_excluir_item_handler(message: types.Message, state: FSMCont
             traceback.print_exc()
         await state.set_state(OrcState.menu)
         return await message.answer("✅ Item excluído. Orçamento ficou vazio e foi apagado.", reply_markup=kb_orcamentos_menu())
+    # se ainda há itens, mostrar lista atualizada
+    itens = await listar_itens_orcamento(orc_id)
+    texto = "Itens do orçamento (atualizado):\n"
+    for it in itens:
+        texto += f"• {build_orc_item_label(it)}\n"
     await state.set_state(OrcState.editar_menu)
-    return await message.answer("✅ Item excluído com sucesso.", reply_markup=ReplyKeyboardRemove())
+    return await message.answer("✅ Item excluído com sucesso.\n\n" + texto, reply_markup=ReplyKeyboardRemove())
 
 
 @router.message(OrcState.editar_editar_selecionar_item)
@@ -702,8 +841,14 @@ async def orc_editar_editar_novo_valor_handler(message: types.Message, state: FS
         )
     finally:
         await conn.close()
+    # após editar, mostrar itens atualizados (conforme fluxograma)
+    orc_id = data.get("editar_orc_id")
+    itens = await listar_itens_orcamento(orc_id)
+    texto = "Itens do orçamento (atualizado):\n"
+    for it in itens:
+        texto += f"• {build_orc_item_label(it)}\n"
     await state.set_state(OrcState.editar_menu)
-    return await message.answer("Item atualizado com sucesso.", reply_markup=ReplyKeyboardRemove())
+    return await message.answer("Item atualizado com sucesso.\n\n" + texto, reply_markup=ReplyKeyboardRemove())
 
 
 # ─── Histórico de orçamentos ───
