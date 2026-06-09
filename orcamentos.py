@@ -7,8 +7,6 @@ from aiogram.fsm.state import StatesGroup, State
 
 import database  # deve expor helpers de conexão e funções como pegar_listas_disponiveis / pegar_itens_da_lista
 
-from collections.abc import Mapping
-
 router = Router()
 
 # --- Estados ---
@@ -106,45 +104,6 @@ def normalize_label(s: str) -> str:
     return " ".join(s.strip().split()).lower()
 
 
-def safe_get(obj, key, default=None):
-    """
-    Acessa de forma segura objetos que podem ser:
-    - dict / Mapping
-    - asyncpg.Record (mapeável)
-    - objetos com atributos
-    - strings (retorna default)
-    - primitivos (retorna default)
-    """
-    if obj is None:
-        return default
-    if isinstance(obj, str):
-        return default
-    if isinstance(obj, Mapping):
-        return obj.get(key, default)
-    # tentativa com getattr
-    try:
-        return getattr(obj, key, default)
-    except Exception:
-        return default
-
-
-def item_display_name(obj):
-    """Retorna o nome exibível do item (item_nome > nome > str(obj))."""
-    name = safe_get(obj, "item_nome")
-    if name:
-        return name
-    name = safe_get(obj, "nome")
-    if name:
-        return name
-    # fallback: se for dict-like com campos variados
-    if isinstance(obj, Mapping):
-        for k in ("produto_nome", "item", "nome_produto"):
-            v = obj.get(k)
-            if v:
-                return v
-    return str(obj)
-
-
 def build_product_label(prod):
     """
     Gera label hierárquico para produtos:
@@ -153,11 +112,11 @@ def build_product_label(prod):
     """
     if isinstance(prod, str):
         return prod
-    nome = safe_get(prod, "nome") or safe_get(prod, "produto_nome") or safe_get(prod, "item_nome") or safe_get(prod, "nome_produto") or ""
-    categoria = safe_get(prod, "categoria") or safe_get(prod, "cat") or ""
-    sub = safe_get(prod, "subcategoria") or safe_get(prod, "sub") or ""
-    unidade = safe_get(prod, "unidade") or safe_get(prod, "un") or ""
-    valor = safe_get(prod, "valor_unitario", None)
+    nome = prod.get("nome") or prod.get("produto_nome") or prod.get("item_nome") or prod.get("nome_produto") or ""
+    categoria = prod.get("categoria") or prod.get("cat") or ""
+    sub = prod.get("subcategoria") or prod.get("sub") or ""
+    unidade = prod.get("unidade") or prod.get("un") or ""
+    valor = prod.get("valor_unitario")
     valor_num = 0.0
     try:
         if valor is not None:
@@ -172,7 +131,7 @@ def build_product_label(prod):
         parts.append(sub)
     if nome:
         parts.append(nome)
-    label = " > ".join(parts) if parts else (nome or str(prod))
+    label = " > ".join(parts) if parts else nome or str(prod)
     if unidade:
         label = f"{label} — {unidade}"
     label = f"{label} — R${valor_num:.2f}"
@@ -185,12 +144,12 @@ def build_orc_item_label(item_row):
     ID:XX | Categoria > Subcategoria > Produto — Unidade — R$X.XX
     """
     try:
-        nome = safe_get(item_row, "item_nome") or safe_get(item_row, "nome") or ""
-        categoria = safe_get(item_row, "categoria") or ""
-        sub = safe_get(item_row, "subcategoria") or ""
-        unidade = safe_get(item_row, "unidade") or ""
-        valor = safe_get(item_row, "valor_unitario", 0.0) or 0.0
-        id_ = safe_get(item_row, "id")
+        nome = item_row.get("item_nome") or item_row.get("nome") or ""
+        categoria = item_row.get("categoria") or ""
+        sub = item_row.get("subcategoria") or ""
+        unidade = item_row.get("unidade") or ""
+        valor = item_row.get("valor_unitario") or 0.0
+        id_ = item_row.get("id")
         parts = []
         if categoria:
             parts.append(categoria)
@@ -198,7 +157,7 @@ def build_orc_item_label(item_row):
             parts.append(sub)
         if nome:
             parts.append(nome)
-        label_main = " > ".join(parts) if parts else (nome or "")
+        label_main = " > ".join(parts) if parts else nome or ""
         if unidade:
             label_main = f"{label_main} — {unidade}"
         label = f"{label_main} — R${float(valor):.2f}"
@@ -206,15 +165,12 @@ def build_orc_item_label(item_row):
             label = f"ID:{id_} | {label}"
         return label
     except Exception:
-        try:
-            id_ = safe_get(item_row, "id")
-            nome = safe_get(item_row, "item_nome") or str(item_row)
-            valor = safe_get(item_row, "valor_unitario", 0.0) or 0.0
-            if id_:
-                return f"ID:{id_} | {nome} — R${float(valor):.2f}"
-            return f"{nome} — R${float(valor):.2f}"
-        except Exception:
-            return str(item_row)
+        id_ = item_row.get("id") if isinstance(item_row, dict) else None
+        nome = item_row.get("item_nome") if isinstance(item_row, dict) else str(item_row)
+        valor = item_row.get("valor_unitario") if isinstance(item_row, dict) else 0.0
+        if id_:
+            return f"ID:{id_} | {nome} — R${float(valor):.2f}"
+        return f"{nome} — R${float(valor):.2f}"
 
 
 # --- DB: garante tabelas/colunas necessárias (idempotente) ---
@@ -262,15 +218,12 @@ async def criar_orcamento(dep_id, tipo_loja, nome_loja, descricao, link, lista_i
             dep_id, tipo_loja, nome_loja, descricao, link, lista_id, criado_por
         )
         for it in itens:
-            item_nome = safe_get(it, "item_nome") or item_display_name(it)
-            quantidade = safe_get(it, "quantidade", 0) or 0
-            valor_unitario = safe_get(it, "valor_unitario", 0) or 0
             await conn.execute(
                 """
                 INSERT INTO orcamento_itens (orcamento_id, item_nome, quantidade, valor_unitario)
                 VALUES ($1,$2,$3,$4)
                 """,
-                orc_id, item_nome, quantidade, valor_unitario
+                orc_id, it.get("item_nome"), it.get("quantidade", 0), it.get("valor_unitario", 0)
             )
         return orc_id
     finally:
@@ -471,7 +424,7 @@ async def orc_novo_selecionar_lista_handler(message: types.Message, state: FSMCo
     categorias = []
     cat_map = {}
     for i in itens:
-        cat = safe_get(i, "categoria", "Sem categoria") or "Sem categoria"
+        cat = i.get("categoria") or "Sem categoria"
         if cat not in cat_map:
             cat_map[cat] = True
             categorias.append(cat)
@@ -499,9 +452,9 @@ async def orc_novo_selecionar_categoria_handler(message: types.Message, state: F
     subcats = []
     sub_map = {}
     for i in itens:
-        if (safe_get(i, "categoria", "Sem categoria") or "Sem categoria") != cat:
+        if (i.get("categoria") or "Sem categoria") != cat:
             continue
-        sub = safe_get(i, "subcategoria", "Sem subcategoria") or "Sem subcategoria"
+        sub = i.get("subcategoria") or "Sem subcategoria"
         if sub not in sub_map:
             sub_map[sub] = True
             subcats.append(sub)
@@ -531,17 +484,15 @@ async def orc_novo_selecionar_subcategoria_handler(message: types.Message, state
 
     # montar produtos (apenas daquela lista+categoria+subcategoria), excluindo já adicionados
     itens = data.get("novo_lista_itens", []) or []
-    existentes = {
-        normalize_label(item_display_name(i))
-        for i in data.get("novo_itens", [])
-    }
+    existentes = { normalize_label(i.get("item_nome") if isinstance(i, dict) else str(i))
+                   for i in data.get("novo_itens", []) }
 
     btns = []
     prod_map = {}
     prod_map_norm = {}
     for i in itens:
-        item_cat = safe_get(i, "categoria", "Sem categoria") or "Sem categoria"
-        item_sub = safe_get(i, "subcategoria", "Sem subcategoria") or "Sem subcategoria"
+        item_cat = i.get("categoria") or "Sem categoria"
+        item_sub = i.get("subcategoria") or "Sem subcategoria"
         if item_cat != data.get("novo_categoria") or item_sub != sub:
             continue
         label = build_product_label(i)
@@ -549,7 +500,7 @@ async def orc_novo_selecionar_subcategoria_handler(message: types.Message, state
         if norm in existentes:
             continue
         btns.append([KeyboardButton(text=label)])
-        prod_key = safe_get(i, "id", i)
+        prod_key = i.get("id") if isinstance(i, dict) else i
         prod_map[label] = prod_key
         prod_map_norm[norm] = prod_key
 
@@ -588,7 +539,7 @@ async def orc_novo_produto_handler(message: types.Message, state: FSMContext):
     if produto_key is None:
         if chave.lower().startswith("id:"):
             try:
-                idnum = int(chave.split(":", 1)[1].strip())
+                idnum = int(chave.split(":")[1].strip())
                 for lbl, pk in prod_map.items():
                     if pk == idnum:
                         produto_key = pk
@@ -647,19 +598,17 @@ async def orc_novo_confirmar_handler(message: types.Message, state: FSMContext):
         if not itens:
             return await message.answer("Lista vazia.")
         # montar categorias novamente, excluindo já adicionados
-        existentes = {
-            normalize_label(item_display_name(i))
-            for i in data.get("novo_itens", [])
-        }
+        existentes = { normalize_label(i.get("item_nome") if isinstance(i, dict) else str(i))
+                       for i in data.get("novo_itens", []) }
         categorias = []
         cat_map = {}
         for i in itens:
-            cat = safe_get(i, "categoria", "Sem categoria") or "Sem categoria"
+            cat = i.get("categoria") or "Sem categoria"
             # somente adicionar categoria se houver produto não existente nesta categoria
             # verifica se existe algum produto nessa categoria que não esteja em existentes
             has_available = False
             for j in itens:
-                if (safe_get(j, "categoria", "Sem categoria") or "Sem categoria") != cat:
+                if (j.get("categoria") or "Sem categoria") != cat:
                     continue
                 lab = build_product_label(j)
                 if normalize_label(lab) not in existentes:
@@ -719,8 +668,8 @@ async def orc_editar_inicio(message: types.Message, state: FSMContext):
     btns = []
     map_orcs = {}
     for o in orcs:
-        nome_loja = safe_get(o, "nome_loja") or safe_get(o, "nome") or "—"
-        tipo = safe_get(o, "tipo_loja") or "—"
+        nome_loja = o.get("nome_loja") or o.get("nome") or "—"
+        tipo = o.get("tipo_loja") or "—"
         label = f"{o['id']} — {nome_loja} ({tipo})"
         btns.append([KeyboardButton(text=label)])
         map_orcs[label] = o["id"]
@@ -785,7 +734,7 @@ async def orc_editar_menu_handler(message: types.Message, state: FSMContext):
         for i in itens:
             label = build_orc_item_label(i)
             btns.append([KeyboardButton(text=label)])
-            excluir_map[label] = safe_get(i, "id")
+            excluir_map[label] = i["id"]
         btns.append([KeyboardButton(text="⬅️ Voltar")])
         kb = ReplyKeyboardMarkup(keyboard=btns, resize_keyboard=True)
         await state.set_state(OrcState.editar_excluir_selecionar_item)
@@ -801,7 +750,7 @@ async def orc_editar_menu_handler(message: types.Message, state: FSMContext):
         for i in itens:
             label = build_orc_item_label(i)
             btns.append([KeyboardButton(text=label)])
-            editar_map[label] = safe_get(i, "id")
+            editar_map[label] = i["id"]
         btns.append([KeyboardButton(text="⬅️ Voltar")])
         kb = ReplyKeyboardMarkup(keyboard=btns, resize_keyboard=True)
         await state.set_state(OrcState.editar_editar_selecionar_item)
@@ -829,16 +778,16 @@ async def orc_editar_incluir_produto_handler(message: types.Message, state: FSMC
     # montar categorias (apenas as que têm produtos disponíveis que ainda não estão no orçamento)
     orc_id = data.get("editar_orc_id")
     existentes_rows = await listar_itens_orcamento(orc_id) if orc_id else []
-    existentes = { normalize_label(safe_get(r, "item_nome") or item_display_name(r)) for r in existentes_rows }
+    existentes = { normalize_label(r.get("item_nome")) for r in existentes_rows }
 
     categorias = []
     cat_map = {}
     for i in itens:
-        cat = safe_get(i, "categoria", "Sem categoria") or "Sem categoria"
+        cat = i.get("categoria") or "Sem categoria"
         # checar se existe produto nessa categoria que não foi adicionado
         has_available = False
         for j in itens:
-            if (safe_get(j, "categoria", "Sem categoria") or "Sem categoria") != cat:
+            if (j.get("categoria") or "Sem categoria") != cat:
                 continue
             if normalize_label(build_product_label(j)) not in existentes:
                 has_available = True
@@ -874,9 +823,9 @@ async def orc_editar_incluir_selecionar_categoria_handler(message: types.Message
     subcats = []
     sub_map = {}
     for i in itens:
-        if (safe_get(i, "categoria", "Sem categoria") or "Sem categoria") != cat:
+        if (i.get("categoria") or "Sem categoria") != cat:
             continue
-        sub = safe_get(i, "subcategoria", "Sem subcategoria") or "Sem subcategoria"
+        sub = i.get("subcategoria") or "Sem subcategoria"
         if sub not in sub_map:
             sub_map[sub] = True
             subcats.append(sub)
@@ -906,14 +855,14 @@ async def orc_editar_incluir_selecionar_subcategoria_handler(message: types.Mess
     itens = data.get("editar_incluir_lista_itens", []) or []
     orc_id = data.get("editar_orc_id")
     existentes_rows = await listar_itens_orcamento(orc_id) if orc_id else []
-    existentes = { normalize_label(safe_get(r, "item_nome") or item_display_name(r)) for r in existentes_rows }
+    existentes = { normalize_label(r.get("item_nome")) for r in existentes_rows }
 
     btns = []
     prod_map = {}
     prod_map_norm = {}
     for i in itens:
-        item_cat = safe_get(i, "categoria", "Sem categoria") or "Sem categoria"
-        item_sub = safe_get(i, "subcategoria", "Sem subcategoria") or "Sem subcategoria"
+        item_cat = i.get("categoria") or "Sem categoria"
+        item_sub = i.get("subcategoria") or "Sem subcategoria"
         if item_cat != data.get("editar_incluir_categoria") or item_sub != sub:
             continue
         label = build_product_label(i)
@@ -921,7 +870,7 @@ async def orc_editar_incluir_selecionar_subcategoria_handler(message: types.Mess
         if norm in existentes:
             continue
         btns.append([KeyboardButton(text=label)])
-        prod_key = safe_get(i, "id", i)
+        prod_key = i.get("id") if isinstance(i, dict) else i
         prod_map[label] = prod_key
         prod_map_norm[norm] = prod_key
 
@@ -956,7 +905,7 @@ async def orc_editar_incluir_produto_qtd_handler(message: types.Message, state: 
                 break
     if prod_key is None and chosen.lower().startswith("id:"):
         try:
-            idnum = int(chosen.split(":", 1)[1].strip())
+            idnum = int(chosen.split(":")[1].strip())
             for lbl, pk in prod_map.items():
                 if pk == idnum:
                     prod_key = pk
@@ -1006,7 +955,7 @@ async def orc_editar_incluir_produto_valor_handler(message: types.Message, state
     # não limpar a lista_id — vamos reabrir a seleção para adicionar mais itens da mesma lista
     itens_da_lista = await database.pegar_itens_da_lista(lista_id) if lista_id else []
     existentes_rows = await listar_itens_orcamento(orc_id) if orc_id else []
-    existentes = { normalize_label(safe_get(r, "item_nome") or item_display_name(r)) for r in existentes_rows }
+    existentes = { normalize_label(r.get("item_nome")) for r in existentes_rows }
 
     btns = []
     prod_map = {}
@@ -1017,7 +966,7 @@ async def orc_editar_incluir_produto_valor_handler(message: types.Message, state
         if norm in existentes:
             continue
         btns.append([KeyboardButton(text=label)])
-        prod_key = safe_get(i, "id", i)
+        prod_key = i.get("id") if isinstance(i, dict) else i
         prod_map[label] = prod_key
         prod_map_norm[norm] = prod_key
 
@@ -1029,7 +978,7 @@ async def orc_editar_incluir_produto_valor_handler(message: types.Message, state
 
     if not btns:
         await state.update_data(editar_incluir_produto=None, editar_incluir_qtd=None, editar_incluir_lista_id=None,
-                    editar_incluir_produtos_map=None, editar_incluir_produtos_map_norm=None)
+                                editar_incluir_produtos_map=None, editar_incluir_produtos_map_norm=None)
         await state.set_state(OrcState.editar_menu)
         return await message.answer(texto + "\nTodos os itens desta lista já constam no orçamento.", reply_markup=ReplyKeyboardRemove())
 
@@ -1039,11 +988,11 @@ async def orc_editar_incluir_produto_valor_handler(message: types.Message, state
     categorias = []
     cat_map = {}
     for i in itens:
-        cat = safe_get(i, "categoria", "Sem categoria") or "Sem categoria"
+        cat = i.get("categoria") or "Sem categoria"
         # checar se essa categoria tem produtos disponíveis não adicionados
         has_available = False
         for j in itens:
-            if (safe_get(j, "categoria", "Sem categoria") or "Sem categoria") != cat:
+            if (j.get("categoria") or "Sem categoria") != cat:
                 continue
             if normalize_label(build_product_label(j)) not in existentes:
                 has_available = True
@@ -1060,8 +1009,8 @@ async def orc_editar_incluir_produto_valor_handler(message: types.Message, state
     btns.append([KeyboardButton(text="⬅️ Voltar")])
     kb = ReplyKeyboardMarkup(keyboard=btns, resize_keyboard=True)
     await state.update_data(editar_incluir_produto=None, editar_incluir_qtd=None,
-                    editar_incluir_produtos_map=prod_map, editar_incluir_produtos_map_norm=prod_map_norm,
-                    editar_incluir_categorias_map={c: c for c in categorias})
+                            editar_incluir_produtos_map=prod_map, editar_incluir_produtos_map_norm=prod_map_norm,
+                            editar_incluir_categorias_map={c: c for c in categorias})
     await state.set_state(OrcState.editar_incluir_selecionar_categoria)
     return await message.answer(texto + "\nSelecione a próxima categoria para incluir itens:", reply_markup=kb)
 
@@ -1168,8 +1117,8 @@ async def orc_historico_inicio(message: types.Message, state: FSMContext):
     btns = []
     map_orcs = {}
     for o in orcs:
-        nome_loja = safe_get(o, "nome_loja") or safe_get(o, "nome") or "—"
-        tipo = safe_get(o, "tipo_loja") or "—"
+        nome_loja = o.get("nome_loja") or o.get("nome") or "—"
+        tipo = o.get("tipo_loja") or "—"
         label = f"{o['id']} — {nome_loja} ({tipo})"
         btns.append([KeyboardButton(text=label)])
         map_orcs[label] = o["id"]
@@ -1198,22 +1147,19 @@ async def orc_historico_selecionar(message: types.Message, state: FSMContext):
         orc_row = await conn.fetchrow("SELECT * FROM orcamentos WHERE id = $1", orc_id)
     finally:
         await conn.close()
-    texto = f"🧾 Orçamento: {safe_get(orc_row, 'nome_loja') or safe_get(orc_row, 'nome') or '—'} — {safe_get(orc_row, 'tipo_loja') or '—'}\n"
-    if safe_get(orc_row, "descricao"):
-        texto += f"📄 {safe_get(orc_row, 'descricao')}\n"
-    if safe_get(orc_row, "link"):
-        texto += f"🔗 {safe_get(orc_row, 'link')}\n"
+    texto = f"🧾 Orçamento: {orc_row.get('nome_loja') or orc_row.get('nome') or '—'} — {orc_row.get('tipo_loja') or '—'}\n"
+    if orc_row.get("descricao"):
+        texto += f"📄 {orc_row['descricao']}\n"
+    if orc_row.get("link"):
+        texto += f"🔗 {orc_row['link']}\n"
     texto += f"\n📦 Itens ({len(itens)}):\n"
     total = 0.0
     for it in itens:
-        q = safe_get(it, "quantidade") or 0
-        v = safe_get(it, "valor_unitario") or 0
-        try:
-            sub = float(q) * float(v)
-        except Exception:
-            sub = 0.0
+        q = it.get("quantidade") or 0
+        v = it.get("valor_unitario") or 0
+        sub = float(q) * float(v)
         total += sub
-        texto += f"• {safe_get(it, 'item_nome')}: {q} x R${float(v):.2f} = R${sub:.2f}\n"
+        texto += f"• {it['item_nome']}: {q} x R${float(v):.2f} = R${sub:.2f}\n"
     texto += f"\n💰 Total estimado: R${total:.2f}"
     btns = [[KeyboardButton(text="⬅️ Voltar")], [KeyboardButton(text="⬅️ Menu Principal")]]
     kb = ReplyKeyboardMarkup(keyboard=btns, resize_keyboard=True)
