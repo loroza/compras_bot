@@ -105,7 +105,7 @@ def normalize_label(s: str) -> str:
 
 
 def as_item_dict(item):
-    """Converte registros/strings em um dicionário com acesso seguro por .get()."""
+    """Converte registros/strings em um dicionário simples com acesso seguro por .get()."""
     if isinstance(item, dict):
         return item
     try:
@@ -118,16 +118,92 @@ def as_item_dict(item):
     return {"item_nome": str(item)}
 
 
+def parse_item_label(raw):
+    """
+    Converte item vindo de lista (string ou dict) para dict com chaves:
+    { 'item_nome', 'categoria', 'subcategoria', 'id' (opcional) }
+
+    Heurísticas aceitas:
+    - Se for dict, retorna normalizado.
+    - Se for string, tenta extrair ID no prefixo "ID:123 | ..." (opcional).
+    - Remove sufixos após " — " (em dash) que normalmente contêm unidade/valor.
+    - Separa hierarquia por ">" (ex: "Categoria > Subcategoria > Nome").
+    - Fallback: item_nome = string inteira, categoria/subcategoria = None.
+    """
+    if isinstance(raw, dict):
+        d = dict(raw)
+        # normalize common keys
+        item_nome = d.get("item_nome") or d.get("nome") or d.get("produto_nome") or d.get("name") or ""
+        return {
+            "item_nome": item_nome,
+            "categoria": d.get("categoria") or d.get("cat"),
+            "subcategoria": d.get("subcategoria") or d.get("sub"),
+            "id": d.get("id")
+        }
+
+    # non-dict -> coerce to str
+    s = str(raw).strip()
+    id_val = None
+
+    # tentar extrair ID: prefixo "ID:123 | rest..."
+    if s.lower().startswith("id:"):
+        try:
+            parts = s.split("|", 1)
+            id_part = parts[0]
+            id_val = int(id_part.split(":", 1)[1].strip())
+            s = parts[1].strip() if len(parts) > 1 else ""
+        except Exception:
+            # se falhar, seguimos sem id
+            pass
+
+    # remover sufixos após " — " (em dash) que costumam ser unidade/valor
+    if " — " in s:
+        left = s.split(" — ")[0]
+    else:
+        left = s
+
+    # separar hierarquia por ">"
+    parts = [p.strip() for p in left.split(">")]
+    parts = [p for p in parts if p != ""]
+
+    categoria = None
+    sub = None
+    nome = None
+    if len(parts) >= 3:
+        categoria = parts[0]
+        sub = parts[1]
+        nome = " > ".join(parts[2:])
+    elif len(parts) == 2:
+        categoria = parts[0]
+        nome = parts[1]
+    elif len(parts) == 1:
+        nome = parts[0]
+    else:
+        nome = left
+
+    # fallback normalization
+    if nome is None or nome == "":
+        nome = s
+
+    return {
+        "item_nome": nome,
+        "categoria": categoria,
+        "subcategoria": sub,
+        "id": id_val
+    }
+
+
 def build_product_label(prod):
     """
     Gera label hierárquico para produtos:
     Categoria > Subcategoria > Produto — Unidade — R$X.XX
-    Aceita dicts com keys variadas ou strings.
+
+    Esta versão usa parse_item_label para ser tolerante a strings vindas do DB.
     """
-    prod = as_item_dict(prod)
-    nome = prod.get("nome") or prod.get("produto_nome") or prod.get("item_nome") or prod.get("nome_produto") or ""
-    categoria = prod.get("categoria") or prod.get("cat") or ""
-    sub = prod.get("subcategoria") or prod.get("sub") or ""
+    prod = parse_item_label(prod) if not isinstance(prod, dict) or "categoria" not in prod else parse_item_label(prod)
+    nome = prod.get("item_nome") or prod.get("nome") or ""
+    categoria = prod.get("categoria") or ""
+    sub = prod.get("subcategoria") or ""
     unidade = prod.get("unidade") or prod.get("un") or ""
     valor = prod.get("valor_unitario")
     valor_num = 0.0
@@ -435,11 +511,11 @@ async def orc_novo_selecionar_lista_handler(message: types.Message, state: FSMCo
 
     # salvar itens da lista no estado para uso nos próximos passos
     await state.update_data(novo_lista_itens=itens)
-    # montar categorias únicas
+    # montar categorias únicas (usando parse_item_label)
     categorias = []
     cat_map = {}
     for raw_i in itens:
-        i = as_item_dict(raw_i)
+        i = parse_item_label(raw_i)
         cat = i.get("categoria") or "Sem categoria"
         if cat not in cat_map:
             cat_map[cat] = True
@@ -468,7 +544,7 @@ async def orc_novo_selecionar_categoria_handler(message: types.Message, state: F
     subcats = []
     sub_map = {}
     for raw_i in itens:
-        i = as_item_dict(raw_i)
+        i = parse_item_label(raw_i)
         if (i.get("categoria") or "Sem categoria") != cat:
             continue
         sub = i.get("subcategoria") or "Sem subcategoria"
@@ -508,7 +584,7 @@ async def orc_novo_selecionar_subcategoria_handler(message: types.Message, state
     prod_map = {}
     prod_map_norm = {}
     for raw_i in itens:
-        i = as_item_dict(raw_i)
+        i = parse_item_label(raw_i)
         item_cat = i.get("categoria") or "Sem categoria"
         item_sub = i.get("subcategoria") or "Sem subcategoria"
         if item_cat != data.get("novo_categoria") or item_sub != sub:
@@ -518,7 +594,7 @@ async def orc_novo_selecionar_subcategoria_handler(message: types.Message, state
         if norm in existentes:
             continue
         btns.append([KeyboardButton(text=label)])
-        prod_key = i.get("id") if isinstance(i, dict) else raw_i
+        prod_key = i.get("id") or build_product_label(i)
         prod_map[label] = prod_key
         prod_map_norm[norm] = prod_key
 
@@ -559,7 +635,7 @@ async def orc_novo_produto_handler(message: types.Message, state: FSMContext):
             try:
                 idnum = int(chave.split(":")[1].strip())
                 for lbl, pk in prod_map.items():
-                    if pk == idnum:
+                    if isinstance(pk, int) and pk == idnum:
                         produto_key = pk
                         chave = lbl
                         break
@@ -621,13 +697,13 @@ async def orc_novo_confirmar_handler(message: types.Message, state: FSMContext):
         categorias = []
         cat_map = {}
         for raw_i in itens:
-            i = as_item_dict(raw_i)
+            i = parse_item_label(raw_i)
             cat = i.get("categoria") or "Sem categoria"
             # somente adicionar categoria se houver produto não existente nesta categoria
             # verifica se existe algum produto nessa categoria que não esteja em existentes
             has_available = False
             for raw_j in itens:
-                j = as_item_dict(raw_j)
+                j = parse_item_label(raw_j)
                 if (j.get("categoria") or "Sem categoria") != cat:
                     continue
                 lab = build_product_label(j)
@@ -802,11 +878,13 @@ async def orc_editar_incluir_produto_handler(message: types.Message, state: FSMC
 
     categorias = []
     cat_map = {}
-    for i in itens:
+    for raw_i in itens:
+        i = parse_item_label(raw_i)
         cat = i.get("categoria") or "Sem categoria"
         # checar se existe produto nessa categoria que não foi adicionado
         has_available = False
-        for j in itens:
+        for raw_j in itens:
+            j = parse_item_label(raw_j)
             if (j.get("categoria") or "Sem categoria") != cat:
                 continue
             if normalize_label(build_product_label(j)) not in existentes:
@@ -842,7 +920,8 @@ async def orc_editar_incluir_selecionar_categoria_handler(message: types.Message
     itens = data.get("editar_incluir_lista_itens", []) or []
     subcats = []
     sub_map = {}
-    for i in itens:
+    for raw_i in itens:
+        i = parse_item_label(raw_i)
         if (i.get("categoria") or "Sem categoria") != cat:
             continue
         sub = i.get("subcategoria") or "Sem subcategoria"
@@ -880,7 +959,8 @@ async def orc_editar_incluir_selecionar_subcategoria_handler(message: types.Mess
     btns = []
     prod_map = {}
     prod_map_norm = {}
-    for i in itens:
+    for raw_i in itens:
+        i = parse_item_label(raw_i)
         item_cat = i.get("categoria") or "Sem categoria"
         item_sub = i.get("subcategoria") or "Sem subcategoria"
         if item_cat != data.get("editar_incluir_categoria") or item_sub != sub:
@@ -890,7 +970,7 @@ async def orc_editar_incluir_selecionar_subcategoria_handler(message: types.Mess
         if norm in existentes:
             continue
         btns.append([KeyboardButton(text=label)])
-        prod_key = i.get("id") if isinstance(i, dict) else i
+        prod_key = i.get("id") or build_product_label(i)
         prod_map[label] = prod_key
         prod_map_norm[norm] = prod_key
 
@@ -927,7 +1007,7 @@ async def orc_editar_incluir_produto_qtd_handler(message: types.Message, state: 
         try:
             idnum = int(chosen.split(":")[1].strip())
             for lbl, pk in prod_map.items():
-                if pk == idnum:
+                if isinstance(pk, int) and pk == idnum:
                     prod_key = pk
                     chosen = lbl
                     break
@@ -980,13 +1060,14 @@ async def orc_editar_incluir_produto_valor_handler(message: types.Message, state
     btns = []
     prod_map = {}
     prod_map_norm = {}
-    for i in itens_da_lista:
+    for raw_i in itens_da_lista:
+        i = parse_item_label(raw_i)
         label = build_product_label(i)
         norm = normalize_label(label)
         if norm in existentes:
             continue
         btns.append([KeyboardButton(text=label)])
-        prod_key = i.get("id") if isinstance(i, dict) else i
+        prod_key = i.get("id") or build_product_label(i)
         prod_map[label] = prod_key
         prod_map_norm[norm] = prod_key
 
@@ -1007,11 +1088,13 @@ async def orc_editar_incluir_produto_valor_handler(message: types.Message, state
     itens = itens_da_lista
     categorias = []
     cat_map = {}
-    for i in itens:
+    for raw_i in itens:
+        i = parse_item_label(raw_i)
         cat = i.get("categoria") or "Sem categoria"
         # checar se essa categoria tem produtos disponíveis não adicionados
         has_available = False
-        for j in itens:
+        for raw_j in itens:
+            j = parse_item_label(raw_j)
             if (j.get("categoria") or "Sem categoria") != cat:
                 continue
             if normalize_label(build_product_label(j)) not in existentes:
