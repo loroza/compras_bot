@@ -1,7 +1,7 @@
 ```mermaid
 flowchart TB
 
-  start[/start] --> escolherDept[Escolher Departamento]
+  A["/start"] --> escolherDept[Escolher Departamento]
   escolherDept --> menuPrincipal{Menu Principal}
   menuPrincipal --> compras[Compras]
   menuPrincipal --> cadastros[Cadastros]
