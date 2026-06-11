@@ -101,7 +101,21 @@ def parse_decimal(text: str) -> float:
 def normalize_label(s: str) -> str:
     if not s:
         return ""
-    return " ".join(s.strip().split()).lower()
+    return " ".join(str(s).strip().split()).lower()
+
+
+def as_item_dict(item):
+    """Converte registros/strings em um dicionário com acesso seguro por .get()."""
+    if isinstance(item, dict):
+        return item
+    try:
+        if hasattr(item, "keys"):
+            return dict(item)
+    except Exception:
+        pass
+    if isinstance(item, str):
+        return {"item_nome": item}
+    return {"item_nome": str(item)}
 
 
 def build_product_label(prod):
@@ -110,8 +124,7 @@ def build_product_label(prod):
     Categoria > Subcategoria > Produto — Unidade — R$X.XX
     Aceita dicts com keys variadas ou strings.
     """
-    if isinstance(prod, str):
-        return prod
+    prod = as_item_dict(prod)
     nome = prod.get("nome") or prod.get("produto_nome") or prod.get("item_nome") or prod.get("nome_produto") or ""
     categoria = prod.get("categoria") or prod.get("cat") or ""
     sub = prod.get("subcategoria") or prod.get("sub") or ""
@@ -144,6 +157,7 @@ def build_orc_item_label(item_row):
     ID:XX | Categoria > Subcategoria > Produto — Unidade — R$X.XX
     """
     try:
+        item_row = as_item_dict(item_row)
         nome = item_row.get("item_nome") or item_row.get("nome") or ""
         categoria = item_row.get("categoria") or ""
         sub = item_row.get("subcategoria") or ""
@@ -165,6 +179,7 @@ def build_orc_item_label(item_row):
             label = f"ID:{id_} | {label}"
         return label
     except Exception:
+        item_row = as_item_dict(item_row)
         id_ = item_row.get("id") if isinstance(item_row, dict) else None
         nome = item_row.get("item_nome") if isinstance(item_row, dict) else str(item_row)
         valor = item_row.get("valor_unitario") if isinstance(item_row, dict) else 0.0
@@ -419,11 +434,12 @@ async def orc_novo_selecionar_lista_handler(message: types.Message, state: FSMCo
         return await message.answer("A lista selecionada não contém itens. Use outra lista ou adicione itens.", reply_markup=kb_voltar())
 
     # salvar itens da lista no estado para uso nos próximos passos
-    await state.update_data(novo_lista_itens=itens, novo_itens=[])
+    await state.update_data(novo_lista_itens=itens)
     # montar categorias únicas
     categorias = []
     cat_map = {}
-    for i in itens:
+    for raw_i in itens:
+        i = as_item_dict(raw_i)
         cat = i.get("categoria") or "Sem categoria"
         if cat not in cat_map:
             cat_map[cat] = True
@@ -451,7 +467,8 @@ async def orc_novo_selecionar_categoria_handler(message: types.Message, state: F
     # montar subcategorias da categoria selecionada
     subcats = []
     sub_map = {}
-    for i in itens:
+    for raw_i in itens:
+        i = as_item_dict(raw_i)
         if (i.get("categoria") or "Sem categoria") != cat:
             continue
         sub = i.get("subcategoria") or "Sem subcategoria"
@@ -484,13 +501,14 @@ async def orc_novo_selecionar_subcategoria_handler(message: types.Message, state
 
     # montar produtos (apenas daquela lista+categoria+subcategoria), excluindo já adicionados
     itens = data.get("novo_lista_itens", []) or []
-    existentes = { normalize_label(i.get("item_nome") if isinstance(i, dict) else str(i))
+    existentes = { normalize_label(as_item_dict(i).get("item_nome"))
                    for i in data.get("novo_itens", []) }
 
     btns = []
     prod_map = {}
     prod_map_norm = {}
-    for i in itens:
+    for raw_i in itens:
+        i = as_item_dict(raw_i)
         item_cat = i.get("categoria") or "Sem categoria"
         item_sub = i.get("subcategoria") or "Sem subcategoria"
         if item_cat != data.get("novo_categoria") or item_sub != sub:
@@ -500,7 +518,7 @@ async def orc_novo_selecionar_subcategoria_handler(message: types.Message, state
         if norm in existentes:
             continue
         btns.append([KeyboardButton(text=label)])
-        prod_key = i.get("id") if isinstance(i, dict) else i
+        prod_key = i.get("id") if isinstance(i, dict) else raw_i
         prod_map[label] = prod_key
         prod_map_norm[norm] = prod_key
 
@@ -540,7 +558,6 @@ async def orc_novo_produto_handler(message: types.Message, state: FSMContext):
         if chave.lower().startswith("id:"):
             try:
                 idnum = int(chave.split(":")[1].strip())
-                # procurar por idnum nos valores do mapa
                 for lbl, pk in prod_map.items():
                     if pk == idnum:
                         produto_key = pk
@@ -599,16 +616,18 @@ async def orc_novo_confirmar_handler(message: types.Message, state: FSMContext):
         if not itens:
             return await message.answer("Lista vazia.")
         # montar categorias novamente, excluindo já adicionados
-        existentes = { normalize_label(i.get("item_nome") if isinstance(i, dict) else str(i))
+        existentes = { normalize_label(as_item_dict(i).get("item_nome"))
                     for i in data.get("novo_itens", []) }
         categorias = []
         cat_map = {}
-        for i in itens:
+        for raw_i in itens:
+            i = as_item_dict(raw_i)
             cat = i.get("categoria") or "Sem categoria"
             # somente adicionar categoria se houver produto não existente nesta categoria
             # verifica se existe algum produto nessa categoria que não esteja em existentes
             has_available = False
-            for j in itens:
+            for raw_j in itens:
+                j = as_item_dict(raw_j)
                 if (j.get("categoria") or "Sem categoria") != cat:
                     continue
                 lab = build_product_label(j)
@@ -918,7 +937,7 @@ async def orc_editar_incluir_produto_qtd_handler(message: types.Message, state: 
         prod_key = chosen
         chosen = chosen_raw
 
-    await state.update_data(editar_incluir_produto=chosen, editar_incluir_qtd=None, editar_incluir_produto_key=prod_key)
+    await state.update_data(editar_incluir_produto=chosen, editar_incluir_qtd=None)
     await state.set_state(OrcState.editar_incluir_produto_valor)
     await message.answer(f"Quantidade para {chosen}:", reply_markup=ReplyKeyboardRemove())
 
@@ -984,6 +1003,7 @@ async def orc_editar_incluir_produto_valor_handler(message: types.Message, state
         return await message.answer(texto + "\nTodos os itens desta lista já constam no orçamento.", reply_markup=ReplyKeyboardRemove())
 
     # se ainda existirem produtos, reabrir fluxo de categorias/subcategorias:
+    # em vez de exibir produtos direto, mostramos novamente categorias disponíveis
     itens = itens_da_lista
     categorias = []
     cat_map = {}
@@ -1175,3 +1195,7 @@ async def orc_historico_detalhe_nav(message: types.Message, state: FSMContext):
         await state.clear()
         return await message.answer("Voltando ao menu principal.", reply_markup=ReplyKeyboardRemove())
     return await message.answer("Use os botões para navegar.")
+
+
+# exporta router
+router
