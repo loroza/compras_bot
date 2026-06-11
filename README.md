@@ -1,3 +1,6 @@
+### Fluxograma de Navegação do Bot
+
+```mermaid
 flowchart TB
   Start([/start]) --> EscolherDepartamento[Escolher Departamento]
   EscolherDepartamento --> MenuPrincipal{Menu Principal}
