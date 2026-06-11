@@ -1,5 +1,6 @@
 ```mermaid
 flowchart TB
+
   start[/start] --> escolherDept[Escolher Departamento]
   escolherDept --> menuPrincipal{Menu Principal}
   menuPrincipal --> compras[Compras]
@@ -24,7 +25,7 @@ flowchart TB
   adicionarCarrinho --> mostrarExtrato[Mostrar extrato do carrinho]
   mostrarExtrato --> navegarCatalogo
 
-  %% Minhas listas -> gerenciamento / iniciar compra
+  %% Minhas listas - gerenciamento / iniciar compra
   minhasListas --> escolherLista[Escolher lista]
   escolherLista --> adicionarItensList[Adicionar itens (cadastro)]
   escolherLista --> iniciarCompra[Iniciar compra]
