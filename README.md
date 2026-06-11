@@ -1,83 +1,83 @@
 ```mermaid
 flowchart TB
-  Start([/start]) --> EscolherDepartamento[Escolher Departamento]
-  EscolherDepartamento --> MenuPrincipal{Menu Principal}
-  MenuPrincipal --> Compras[Compras]
-  MenuPrincipal --> Cadastros[Cadastros]
-  MenuPrincipal --> Historico[Histórico]
-  MenuPrincipal --> Orcamentos[Orçamentos]
-  MenuPrincipal --> TrocarDept[Trocar Departamento]
+  start[/start] --> escolherDept[Escolher Departamento]
+  escolherDept --> menuPrincipal{Menu Principal}
+  menuPrincipal --> compras[Compras]
+  menuPrincipal --> cadastros[Cadastros]
+  menuPrincipal --> historico[Histórico]
+  menuPrincipal --> orcamentos[Orçamentos]
+  menuPrincipal --> trocarDept[Trocar Departamento]
 
   %% Compras
-  Compras --> ComprasMenu[Menu de Compras]
-  ComprasMenu --> CompraAvulsa[Compra Avulsa]
-  ComprasMenu --> MinhasListas[Minhas Listas]
-  ComprasMenu --> VerCarrinho[Ver Carrinho]
-  ComprasMenu --> VoltarCompras[Voltar Compras]
+  compras --> comprasMenu[Menu de Compras]
+  comprasMenu --> compraAvulsa[Compra Avulsa]
+  comprasMenu --> minhasListas[Minhas Listas]
+  comprasMenu --> verCarrinho[Ver Carrinho]
+  comprasMenu --> voltarCompras[Voltar Compras]
 
-  %% Compra Avulsa flow
-  CompraAvulsa --> NavegarCatalogo[Navegar catálogo]
-  NavegarCatalogo --> SelecionarProduto[Selecionar produto]
-  SelecionarProduto --> Qtd[Digite quantidade]
-  Qtd --> Valor[Digite valor unitário]
-  Valor --> AdicionarCarrinho[adicionar_ao_carrinho()]
-  AdicionarCarrinho --> MostrarExtrato[Mostrar extrato do carrinho]
-  MostrarExtrato --> NavegarCatalogo
+  %% Compra Avulsa
+  compraAvulsa --> navegarCatalogo[Navegar catálogo]
+  navegarCatalogo --> selecionarProduto[Selecionar produto]
+  selecionarProduto --> qtd[Digite quantidade]
+  qtd --> valor[Digite valor unitário]
+  valor --> adicionarCarrinho[Adicionar ao carrinho]
+  adicionarCarrinho --> mostrarExtrato[Mostrar extrato do carrinho]
+  mostrarExtrato --> navegarCatalogo
 
-  %% Minhas listas - gerenciamento/iniciar compra
-  MinhasListas --> EscolherLista[Escolher lista]
-  EscolherLista --> AdicionarItensList[Adicionar Itens (cadastro)]
-  EscolherLista --> IniciarCompra[Iniciar Compra]
-  AdicionarItensList --> NavegCatalogoList[Navegar catálogo e adicionar à lista]
-  IniciarCompra --> CompraNavegando[compra_navegando - itens pendentes]
-  CompraNavegando --> CompraQtd[compra_quantidade]
-  CompraQtd --> CompraValor[compra_valor]
-  CompraValor --> AdicionarCarrinho
-  CompraValor --> FinalOpcao{Lista fixa?}
-  FinalOpcao -->|Sim| FinalizarOpcao[Finalizar compra / Finalizar lista]
-  FinalOpcao -->|Não| VoltarOrigem[Voltar ao menu / origem]
+  %% Minhas listas -> gerenciamento / iniciar compra
+  minhasListas --> escolherLista[Escolher lista]
+  escolherLista --> adicionarItensList[Adicionar itens (cadastro)]
+  escolherLista --> iniciarCompra[Iniciar compra]
+  adicionarItensList --> navegarCatalogoLista[Navegar catálogo e adicionar à lista]
+  iniciarCompra --> compraNavegando[Compra navegando - itens pendentes]
+  compraNavegando --> compraQtd[Quantidade]
+  compraQtd --> compraValor[Valor]
+  compraValor --> adicionarCarrinho
+  compraValor --> finalOpcao{Lista fixa?}
+  finalOpcao -->|Sim| finalizarOpcao[Finalizar compra / finalizar lista]
+  finalOpcao -->|Não| voltarOrigem[Voltar ao menu / origem]
 
   %% Ver Carrinho
-  VerCarrinho --> CarrinhoMenu[Menu do Carrinho]
-  CarrinhoMenu --> RemoverItem[Remover Item]
-  CarrinhoMenu --> LimparCarrinho[Limpar Carrinho]
-  LimparCarrinho --> ConfirmarLimpar[Confirmar / Cancelar]
-  CarrinhoMenu --> FinalizarCompra[Finalizar Compra]
-  FinalizarCompra --> PerguntarMercado[Qual o nome do mercado?]
-  PerguntarMercado --> ConfirmarFinalizar[Confirmar / Cancelar]
-  ConfirmarFinalizar --> SalvarHistorico[salvar_historico()]
+  verCarrinho --> carrinhoMenu[Menu do carrinho]
+  carrinhoMenu --> removerItem[Remover item]
+  carrinhoMenu --> limparCarrinho[Limpar carrinho]
+  limparCarrinho --> confirmarLimpar[Confirmar / Cancelar]
+  carrinhoMenu --> finalizarCompra[Finalizar compra]
+  finalizarCompra --> perguntarMercado[Qual o nome do mercado?]
+  perguntarMercado --> confirmarFinalizar[Confirmar / Cancelar]
+  confirmarFinalizar --> salvarHistorico[Salvar histórico]
 
   %% Cadastros / Listas
-  Cadastros --> ListasMenu[Gerenciar Listas]
-  ListasMenu --> NovaLista[Nova Lista (tipo -> nome)]
-  ListasMenu --> AdicionarItens[Adicionar Itens]
-  ListasMenu --> RemoverItemLista[Remover Item]
+  cadastros --> listasMenu[Gerenciar listas]
+  listasMenu --> novaLista[Nova lista (tipo -> nome)]
+  listasMenu --> adicionarItens[Adicionar itens]
+  listasMenu --> removerItemLista[Remover item]
 
   %% Orçamentos
-  Orcamentos --> OrcMenu[Menu de Orçamentos]
-  OrcMenu --> NovoOrc[Novo orçamento]
-  NovoOrc --> TipoLoja[Tipo loja (Física / E-commerce)]
-  TipoLoja --> NomeLoja[Nome da loja]
-  NomeLoja --> Descricao[Descrição / Link]
-  Descricao --> SelecionarLista[Selecionar lista]
-  SelecionarLista --> SelecionarCategoria[Categoria > Subcategoria > Produto]
-  SelecionarCategoria --> QtdOrc[Quantidade]
-  QtdOrc --> ValorOrc[Valor unitário]
-  ValorOrc --> ConfirmarOrc[Finalizar / Adicionar outro item]
-  ConfirmarOrc --> CriarOrcamento[criar_orcamento()]
+  orcamentos --> orcMenu[Menu de orçamentos]
+  orcMenu --> novoOrc[Novo orçamento]
+  novoOrc --> tipoLoja[Tipo loja (Física / E-commerce)]
+  tipoLoja --> nomeLoja[Nome da loja]
+  nomeLoja --> descricao[Descrição / Link]
+  descricao --> selecionarLista[Selecionar lista]
+  selecionarLista --> selecionarCategoria[Categoria / Subcategoria / Produto]
+  selecionarCategoria --> qtdOrc[Quantidade]
+  qtdOrc --> valorOrc[Valor unitário]
+  valorOrc --> confirmarOrc[Finalizar / Adicionar outro item]
+  confirmarOrc --> criarOrcamento[Criar orçamento]
 
-  OrcMenu --> EditarOrc[Editar orçamento]
-  EditarOrc --> IncluirItem[Incluir item]
-  EditarOrc --> ExcluirItem[Excluir item]
-  EditarOrc --> EditarItem[Editar item]
+  orcMenu --> editarOrc[Editar orçamento]
+  editarOrc --> incluirItem[Incluir item]
+  editarOrc --> excluirItem[Excluir item]
+  editarOrc --> editarItem[Editar item]
 
-  %% Histórico (compras)
-  Historico --> HistMenu[Histórico de compras]
-  HistMenu --> VerDetalhe[Selecionar compra e ver itens / total]
+  %% Histórico
+  historico --> histMenu[Histórico de compras]
+  histMenu --> verDetalhe[Selecionar compra e ver itens/total]
 
   %% Trocar departamento
-  TrocarDept --> EscolherDepartamento
+  trocarDept --> escolherDept
 
-  %% utility
-  VoltarOrigem --> MenuPrincipal
-  SalvarHistorico --> VoltarOrigem
+  %% utilitário
+  voltarOrigem --> menuPrincipal
+  salvarHistorico --> voltarOrigem
