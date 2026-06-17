@@ -60,6 +60,13 @@ async def limpar_estado_preservando_departamento(state: FSMContext):
         await state.set_data(preserved)
 
 
+# helper para mostrar labels sem "_"
+def display_label(key: str) -> str:
+    if key is None or key == "_no_sub":
+        return "Geral"
+    return str(key).replace("_", " ").title()
+
+
 def parse_decimal(text: str) -> float:
     """
     Converte strings como:
@@ -311,8 +318,7 @@ def montar_extrato_carrinho(itens):
                 global_idx += 1
             lines.append("")  # linha em branco entre subcategorias
         lines.append("")  # linha em branco entre categorias
-    lines.append("*" * 51)
-    lines.append(f"Valor Total do Carrinho: R${total_cart:.2f}")
+    lines.append(f"🛒 Valor Total do Carrinho: R$ {total_cart:.2f}")
     return "\n".join(lines)
 
 
@@ -412,7 +418,7 @@ async def send_extrato_por_categoria(message: types.Message, itens, *,
         await send_text_in_chunks(message, t)
 
     # enviar total geral com teclado (se dado)
-    total_text = ("*" * 27) + "\n" + f"Valor Total do Carrinho: R${total:.2f}"
+    total_text = f"🛒 Valor Total do Carrinho: R$ {total:.2f}"
     await send_text_in_chunks(message, total_text, reply_markup=reply_markup, parse_mode=parse_mode)
 
 
@@ -742,9 +748,12 @@ async def iniciar_remover_item(message: types.Message, state: FSMContext):
 
     # construir teclado com apenas categorias (cada categoria aparece uma vez)
     btns = []
-    category_map = {}  # categoria -> list(subs)
+    category_map = {}  # categoria_raw -> list(subs_raw)
+    category_display_map = {}  # display_label -> categoria_raw
     for cat in sorted(groups.keys()):
-        btns.append([KeyboardButton(text=cat.upper().replace("_", " "))])
+        label = display_label(cat)
+        btns.append([KeyboardButton(text=label)])
+        category_display_map[label] = cat
         # obter subkeys e mapear
         subs = []
         for sub in groups[cat].keys():
@@ -756,8 +765,11 @@ async def iniciar_remover_item(message: types.Message, state: FSMContext):
     kb = ReplyKeyboardMarkup(keyboard=btns, resize_keyboard=True)
 
     # salvar mapa de categorias e o global_map no estado (será usado nos próximos passos)
-    # armazenamos global_map (chaves int -> info) e category_map
-    await state.update_data(remover_global_map={k: v for k, v in global_map.items()}, remover_category_map=category_map)
+    await state.update_data(
+        remover_global_map={k: v for k, v in global_map.items()},
+        remover_category_map=category_map,
+        remover_category_display_map=category_display_map,
+    )
     await state.set_state(MainState.remover_escolher_categoria)
     await message.answer("Selecione a CATEGORIA do item que deseja remover:", reply_markup=kb)
 
@@ -773,35 +785,32 @@ async def remover_escolher_categoria_handler(message: types.Message, state: FSMC
 
     data = await state.get_data()
     category_map = data.get("remover_category_map", {})
+    display_map = data.get("remover_category_display_map", {})
     global_map = data.get("remover_global_map", {})
 
-    if text not in category_map:
+    # traduzir label mostrado para chave raw (se necessário)
+    if text in display_map:
+        cat = display_map[text]
+    elif text in category_map:
+        cat = text
+    else:
         return await message.answer("Escolha inválida. Selecione uma das CATEGORIAS mostradas.")
 
-    cat = text
     subs = category_map.get(cat, [])
 
-    # montar teclado com subcategorias (exibir "Geral" quando sub == "_no_sub")
+    # montar teclado com subcategorias (usar display_label para apresentar sem "_")
     btns = []
     for sub in subs:
-        sub_label = "Geral" if sub == "_no_sub" or sub is None else (sub.title().upper() if sub != "_no_sub" else "Geral")
-        # fix cases where sub might be None
-        if sub is None:
-            sub_label = "Geral"
-        elif sub == "_no_sub":
-            sub_label = "Geral"
-        else:
-            sub_label = sub.title()
-        btns.append([KeyboardButton(text=sub_label)])
+        btns.append([KeyboardButton(text=display_label(sub))])
     # adicionar opção para todos (caso queira ver todos os itens da categoria)
     btns.append([KeyboardButton(text="Todos")])
     btns.append([KeyboardButton(text="⬅️ Voltar")])
     kb = ReplyKeyboardMarkup(keyboard=btns, resize_keyboard=True)
 
-    # salvar a categoria escolhida (e o global_map) no estado
+    # salvar a categoria escolhida (raw) no estado
     await state.update_data(remover_chosen_categoria=cat)
     await state.set_state(MainState.remover_escolher_subcategoria)
-    await message.answer(f"Categoria selecionada: *{cat}*\nAgora escolha a SUBCATEGORIA:", parse_mode="Markdown", reply_markup=kb)
+    await message.answer(f"Categoria selecionada: *{display_label(cat)}*\nAgora escolha a SUBCATEGORIA:", parse_mode="Markdown", reply_markup=kb)
 
 
 # ─── USUÁRIO ESCOLHE SUBCATEGORIA: mostrar itens com numeração apenas dessa subcategoria (ou todos)
@@ -812,7 +821,7 @@ async def remover_escolher_subcategoria_handler(message: types.Message, state: F
         # voltar para escolher categoria novamente
         data = await state.get_data()
         category_map = data.get("remover_category_map", {})
-        btns = [[KeyboardButton(text=c)] for c in category_map.keys()]
+        btns = [[KeyboardButton(text=display_label(c))] for c in category_map.keys()]
         btns.append([KeyboardButton(text="⬅️ Voltar")])
         kb = ReplyKeyboardMarkup(keyboard=btns, resize_keyboard=True)
         await state.set_state(MainState.remover_escolher_categoria)
@@ -833,7 +842,6 @@ async def remover_escolher_subcategoria_handler(message: types.Message, state: F
         chosen_sub = "ALL"
     else:
         # map back from displayed sub_label to stored sub key:
-        # as we rendered sub_label from raw keys, try to guess:
         sub_label_input = text.strip().lower()
         # tentar encontrar sub correspondente em remover_category_map
         cat_map = data.get("remover_category_map", {})
@@ -843,13 +851,17 @@ async def remover_escolher_subcategoria_handler(message: types.Message, state: F
             if sub in (None, "_no_sub") and sub_label_input in ("geral", "general", "g"):
                 matched = sub
                 break
+            # comparar com o display_label do sub
+            if display_label(sub).lower() == sub_label_input:
+                matched = sub
+                break
+            # outras tentativas de match
             if sub and sub_label_input == (sub.lower()):
                 matched = sub
                 break
             if sub and sub_label_input == sub.lower().replace("_", " "):
                 matched = sub
                 break
-            # tentar título
             if sub and sub_label_input == sub.title().lower():
                 matched = sub
                 break
@@ -878,8 +890,8 @@ async def remover_escolher_subcategoria_handler(message: types.Message, state: F
 
     # montar texto com itens desta (sub)categoria (usando idx formatado com 3 dígitos)
     lines = []
-    sub_label_print = "Todos" if chosen_sub == "ALL" else ("Geral" if chosen_sub in ("_no_sub", None) else chosen_sub.title())
-    lines.append(f"Itens em: {cat} / {sub_label_print}")
+    sub_label_print = "Todos" if chosen_sub == "ALL" else (display_label(chosen_sub) if chosen_sub not in ("_no_sub", None) else "Geral")
+    lines.append(f"Itens em: {display_label(cat)} / {sub_label_print}")
     lines.append("")
     for idx, info in selected_entries:
         it = info["item"]
@@ -906,16 +918,12 @@ async def remover_informar_idx_handler(message: types.Message, state: FSMContext
         # voltar para escolher subcategoria (reusar handler)
         data = await state.get_data()
         cat = data.get("remover_chosen_categoria")
-        # reconstruir teclado de subcategorias
+        # reconstruir teclado de subcategorias usando display_label
         cat_map = data.get("remover_category_map", {})
         subs = cat_map.get(cat, [])
         btns = []
         for sub in subs:
-            if sub is None or sub == "_no_sub":
-                sub_label = "Geral"
-            else:
-                sub_label = sub.title()
-            btns.append([KeyboardButton(text=sub_label)])
+            btns.append([KeyboardButton(text=display_label(sub))])
         btns.append([KeyboardButton(text="Todos")])
         btns.append([KeyboardButton(text="⬅️ Voltar")])
         kb = ReplyKeyboardMarkup(keyboard=btns, resize_keyboard=True)
@@ -1210,26 +1218,6 @@ async def selecionar_historico(message: types.Message, state: FSMContext):
     )
     await state.set_state(MainState.historico_detalhe)
     await send_text_in_chunks(message, texto, parse_mode="Markdown", reply_markup=kb_voltar)
-
-
-@dp.message(MainState.historico_detalhe)
-async def historico_detalhe_nav(message: types.Message, state: FSMContext):
-    dep_id, dep_nome, _, _ = await get_dep_data(state)
-
-    if message.text == "⬅️ Voltar Histórico":
-        compras = await database.listar_historico(dep_id)
-        btns = []
-        for c in compras:
-            data_fmt = c["data"].strftime("%d/%m/%Y %H:%M") if c.get("data") else "?"
-            label = f"🏪 {c['mercado']} — R${c['total']:.2f} ({data_fmt})"
-            btns.append([KeyboardButton(text=label)])
-        btns.append([KeyboardButton(text="⬅️ Menu Principal")])
-        kb = ReplyKeyboardMarkup(keyboard=btns, resize_keyboard=True)
-        await state.set_state(MainState.historico_menu)
-        await state.update_data(historico_compras=[dict(c) for c in compras])
-        return await message.answer("📜 Selecione uma compra:", reply_markup=kb)
-
-    # NOTE: "⬅️ Menu Principal" é tratado pelo handler centralizado (ver abaixo).
 
 
 # Centralizado: trata "⬅️ Menu Principal" apenas nos states onde isso realmente
