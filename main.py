@@ -744,7 +744,7 @@ async def iniciar_remover_item(message: types.Message, state: FSMContext):
     btns = []
     category_map = {}  # categoria -> list(subs)
     for cat in sorted(groups.keys()):
-        btns.append([KeyboardButton(text=cat)])
+        btns.append([KeyboardButton(text=cat.upper().replace("_", " "))])
         # obter subkeys e mapear
         subs = []
         for sub in groups[cat].keys():
@@ -784,7 +784,7 @@ async def remover_escolher_categoria_handler(message: types.Message, state: FSMC
     # montar teclado com subcategorias (exibir "Geral" quando sub == "_no_sub")
     btns = []
     for sub in subs:
-        sub_label = "Geral" if sub == "_no_sub" or sub is None else (sub.title() if sub != "_no_sub" else "Geral")
+        sub_label = "Geral" if sub == "_no_sub" or sub is None else (sub.title().upper() if sub != "_no_sub" else "Geral")
         # fix cases where sub might be None
         if sub is None:
             sub_label = "Geral"
