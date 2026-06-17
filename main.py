@@ -293,13 +293,13 @@ def montar_extrato_carrinho(itens):
     for cat, subdict in groups.items():
         # subtotal da categoria
         cat_subtotal = sum(it["total"] for items in subdict.values() for it in items)
-        lines.append(f"{cat.upper()}: R${cat_subtotal:.2f}")
+        lines.append(f"{cat.upper()}: R$ {cat_subtotal:.2f}")
         for sub, items in subdict.items():
             sub_label = "Geral" if sub == "_no_sub" else sub.title()
             sub_subtotal = sum(it["total"] for it in items)
-            lines.append(f"{sub_label}: R${sub_subtotal:.2f}")
+            lines.append(f"{sub_label}: R$ {sub_subtotal:.2f}")
             for it in items:
-                lines.append(f" ➥ {catalogo.formatar(it['nome'])}: {it['qtd']:.3f} x R${it['valor_unit']:.2f} = R${it['total']:.2f}")
+                lines.append(f" ➥ {catalogo.formatar(it['nome'])}\n{it['qtd']:.3f} x {it['valor_unit']:.2f} = {it['total']:.2f}")
             lines.append("")  # linha em branco entre subcategorias
         lines.append("")  # linha em branco entre categorias
     lines.append("*" * 51)
