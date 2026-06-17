@@ -361,7 +361,7 @@ def dividir_extrato_por_categoria(itens):
     for cat in sorted(groups.keys()):
         subdict = groups[cat]
         lines = []
-        lines.append(f"**{cat.upper()}**")
+        lines.append(f"{cat.upper()}")
         lines.append("")  # linha em branco
 
         # subtotal da categoria
@@ -370,9 +370,9 @@ def dividir_extrato_por_categoria(itens):
         for sub, items in subdict.items():
             sub_label = "Geral" if sub == "_no_sub" else sub.title()
             sub_subtotal = sum(it["total"] for it in items)
-            lines.append(f"**{sub_label}**: R$ {sub_subtotal:.2f}")
-            for it in items:
-                lines.append(f"{catalogo.formatar(it['nome'])}\n    {it['qtd']:.3f} x R$ {it['valor_unit']:.2f} = R$ {it['total']:.2f}")
+            lines.append(f"*** {sub_label}: R$ {sub_subtotal:.2f}")
+            for idx, it in enumerate(items, start=1):
+                lines.append(f"{idx:03d}   {catalogo.formatar(it['nome'])}\n    {it['qtd']:.3f} x R$ {it['valor_unit']:.2f} = R$ {it['total']:.2f}")
             lines.append("")  # linha em branco entre subcategorias
 
         lines.append(f"Subtotal da categoria: R$ {cat_subtotal:.2f}")
@@ -403,7 +403,7 @@ async def send_extrato_por_categoria(message: types.Message, itens, *,
         await send_text_in_chunks(message, t)
 
     # enviar total geral com teclado (se dado)
-    total_text = ("*" * 27) + "\n" + f"Valor Total do Carrinho: R$ {total:.2f}"
+    total_text = f"🛒 Valor Total do Carrinho: R$ {total:.2f}"
     await send_text_in_chunks(message, total_text, reply_markup=reply_markup, parse_mode=parse_mode)
 
 
