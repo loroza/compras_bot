@@ -84,6 +84,45 @@ def parse_decimal(text: str) -> float:
     return float(s)
 
 
+# --- NEW HELPER: envia textos longos em pedaços seguros para o Telegram ---
+async def send_text_in_chunks(message: types.Message, text: str, *,
+                              reply_markup: types.ReplyKeyboardMarkup | None = None,
+                              parse_mode: str | None = None,
+                              chunk_size: int = 4000):
+    """
+    Divide `text` em partes <= chunk_size respeitando quebras de linha quando possível.
+    Anexa `reply_markup` somente ao último chunk (para evitar keyboards duplicados).
+    """
+    if not text:
+        return await message.answer("", reply_markup=reply_markup)
+
+    # preserva quebras de linha ao dividir
+    lines = text.splitlines(keepends=True)
+    chunks = []
+    cur = ""
+    for line in lines:
+        if len(cur) + len(line) > chunk_size:
+            if cur:
+                chunks.append(cur)
+                cur = line
+            else:
+                # linha individual maior que chunk_size -> dividir forçado
+                for i in range(0, len(line), chunk_size):
+                    chunks.append(line[i:i+chunk_size])
+                cur = ""
+        else:
+            cur += line
+    if cur:
+        chunks.append(cur)
+
+    # enviar cada chunk; somente o último com reply_markup/parse_mode
+    for idx, ch in enumerate(chunks):
+        is_last = idx == (len(chunks) - 1)
+        markup = reply_markup if is_last else None
+        pmode = parse_mode if is_last else None
+        await message.answer(ch, parse_mode=pmode, reply_markup=markup)
+
+
 # --- KEYBOARDS ---
 def kb_departamentos(departamentos):
     btns = []
@@ -489,7 +528,7 @@ async def set_valor(message: types.Message, state: FSMContext):
         await message.answer("Erro ao recuperar o carrinho. Tente novamente.")
         return
 
-    # Monta e envia o extrato
+    # Monta e envia o extrato (pode ser longo) usando envio em chunks
     extrato = montar_extrato_carrinho(itens)
 
     # NÃO limpar o estado: voltar para navegação para permitir adicionar mais itens
@@ -497,7 +536,7 @@ async def set_valor(message: types.Message, state: FSMContext):
     await state.update_data(caminho=[])
 
     opts = list(catalogo.CATALOGO.keys())
-    await message.answer(extrato)
+    await send_text_in_chunks(message, extrato)  # sem teclado no extrato; próximo pergunta terá teclado
     # sem botão Cancelar aqui por padrão
     return await message.answer("Deseja adicionar mais itens?", reply_markup=kb_opcoes(opts, True, False))
 
@@ -520,7 +559,8 @@ async def ver_carrinho(message: types.Message, state: FSMContext):
         return await message.answer("Carrinho vazio!", reply_markup=kb_menu_compras())
     texto = montar_extrato_carrinho(itens)
     await state.set_state(MainState.carrinho_menu)
-    await message.answer(texto, reply_markup=kb_carrinho_menu())
+    # usa envio em chunks; o reply_markup só será anexado ao último chunk
+    await send_text_in_chunks(message, texto, reply_markup=kb_carrinho_menu())
 
 
 # ─── LIMPAR CARRINHO e CONFIRMAR AÇÕES ────
@@ -587,7 +627,8 @@ async def cancelar_acao_carrinho(message: types.Message, state: FSMContext):
     if not itens:
         return await message.answer("Carrinho vazio!", reply_markup=kb_menu_compras())
     texto = montar_extrato_carrinho(itens)
-    await message.answer(texto, reply_markup=kb_carrinho_menu())
+    # enviar em chunks com o teclado do carrinho anexado ao último
+    await send_text_in_chunks(message, texto, reply_markup=kb_carrinho_menu())
 
 
 # ─── FINALIZAR COMPRA (via carrinho) ────
@@ -625,7 +666,8 @@ async def finalizar_do_carrinho(message: types.Message, state: FSMContext):
     texto += f"\n💰 *Total: R${total:.2f}*\n\n🏪 Qual o nome do mercado?"
     await state.set_state(MainState.finalizando_mercado)
     await state.update_data(itens_detalhe=itens_detalhe, total=total)
-    await message.answer(texto, parse_mode="Markdown", reply_markup=ReplyKeyboardRemove())
+    # usar envio em chunks (parse_mode Markdown)
+    await send_text_in_chunks(message, texto, parse_mode="Markdown", reply_markup=ReplyKeyboardRemove())
 
 
 @dp.message(MainState.finalizando_mercado)
@@ -718,7 +760,7 @@ async def selecionar_historico(message: types.Message, state: FSMContext):
         resize_keyboard=True,
     )
     await state.set_state(MainState.historico_detalhe)
-    await message.answer(texto, parse_mode="Markdown", reply_markup=kb_voltar)
+    await send_text_in_chunks(message, texto, parse_mode="Markdown", reply_markup=kb_voltar)
 
 
 @dp.message(MainState.historico_detalhe)
