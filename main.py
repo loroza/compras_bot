@@ -370,12 +370,13 @@ def dividir_extrato_por_categoria(itens):
         for sub, items in subdict.items():
             sub_label = "Geral" if sub == "_no_sub" else sub.title()
             sub_subtotal = sum(it["total"] for it in items)
-            lines.append(f"*** {sub_label}: R$ {sub_subtotal:.2f}")
+            lines.append(f"{sub_label.upper()}")
             for idx, it in enumerate(items, start=1):
                 lines.append(f"{idx:03d}   {catalogo.formatar(it['nome'])}\n    {it['qtd']:.3f} x R$ {it['valor_unit']:.2f} = R$ {it['total']:.2f}")
+            lines.append(f"➥ Total da subcategoria: R$ {sub_subtotal:.2f}")
             lines.append("")  # linha em branco entre subcategorias
 
-        lines.append(f"Subtotal da categoria: R$ {cat_subtotal:.2f}")
+        lines.append(f"🧮 Total da categoria: R$ {cat_subtotal:.2f}")
         textos.append("\n".join(lines).replace("_", " "))
 
     return textos, total_cart
