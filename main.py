@@ -1182,7 +1182,7 @@ async def abrir_historico(message: types.Message, state: FSMContext):
 
 @dp.message(MainState.historico_menu)
 async def selecionar_historico(message: types.Message, state: FSMContext):
-    # NOTE: "⬅️ Menu Principal" é tratado pelo handler centralizado (ver abaixo).
+    # NOTE: "⬅️ Menu Principal" é tratado pelo handler global (ver abaixo).
     data = await state.get_data()
     compras = data.get("historico_compras", [])
     compra_selecionada = None
@@ -1220,17 +1220,10 @@ async def selecionar_historico(message: types.Message, state: FSMContext):
     await send_text_in_chunks(message, texto, parse_mode="Markdown", reply_markup=kb_voltar)
 
 
-# Centralizado: trata "⬅️ Menu Principal" apenas nos states onde isso realmente
-# deve voltar ao menu principal, evitando interceptar botões de navegação interna.
-@dp.message(
-    MainState.menu_principal,
-    MainState.carrinho_menu,
-    MainState.historico_menu,
-    MainState.historico_detalhe,
-    F.text == "⬅️ Menu Principal",
-)
-async def voltar_menu_principal(message: types.Message, state: FSMContext):
-    print(f"[DEBUG][PID {os.getpid()}][voltar_menu_principal] ts={time.time()} user={message.from_user.id}")
+# Handler global para "⬅️ Menu Principal" (captura independentemente do state)
+@dp.message(F.text == "⬅️ Menu Principal")
+async def global_voltar_menu_principal(message: types.Message, state: FSMContext):
+    print(f"[DEBUG][PID {os.getpid()}][global_voltar_menu_principal] ts={time.time()} user={message.from_user.id}")
     dep_id, *_ = await get_dep_data(state)
     if not dep_id:
         # sem departamento escolhido — reiniciar fluxo
@@ -1239,7 +1232,7 @@ async def voltar_menu_principal(message: types.Message, state: FSMContext):
         deps = await database.listar_departamentos()
         return await message.answer("🏬 Escolha o departamento:", reply_markup=kb_departamentos(deps))
 
-    # preservar departamento e voltar ao menu principal
+    # preservar departamento e voltar ao menu principal "completo"
     await limpar_estado_preservando_departamento(state)
     await state.set_state(MainState.menu_principal)
     await message.answer("Menu principal:", reply_markup=kb_menu_principal())
