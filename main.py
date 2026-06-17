@@ -784,7 +784,7 @@ async def remover_escolher_categoria_handler(message: types.Message, state: FSMC
     # montar teclado com subcategorias (exibir "Geral" quando sub == "_no_sub")
     btns = []
     for sub in subs:
-        sub_label = "Geral" if sub == "_no_sub' or sub is None else (sub.title() if sub != "_no_sub" else "Geral")
+        sub_label = "Geral" if sub == "_no_sub" or sub is None else (sub.title() if sub != "_no_sub" else "Geral")
         # fix cases where sub might be None
         if sub is None:
             sub_label = "Geral"
