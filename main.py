@@ -303,8 +303,8 @@ def montar_extrato_carrinho(itens):
             lines.append("")  # linha em branco entre subcategorias
         lines.append("")  # linha em branco entre categorias
     lines.append("*" * 51)
-    lines.append(f"Valor Total do Carrinho: R${total_cart:.2f}")
-    return "\n".join(lines)
+    lines.append(f"Valor Total do Carrinho: R$ {total_cart:.2f}")
+    return "\n".join(lines.replace("_", " "))
 
 
 # --- NOVO: dividir extrato por categoria e enviar por categoria ---
@@ -361,8 +361,7 @@ def dividir_extrato_por_categoria(itens):
     for cat in sorted(groups.keys()):
         subdict = groups[cat]
         lines = []
-        lines.append("*" * 27)
-        lines.append(cat.upper())
+        lines.append(f"**{cat.upper()}**")
         lines.append("")  # linha em branco
 
         # subtotal da categoria
@@ -371,13 +370,13 @@ def dividir_extrato_por_categoria(itens):
         for sub, items in subdict.items():
             sub_label = "Geral" if sub == "_no_sub" else sub.title()
             sub_subtotal = sum(it["total"] for it in items)
-            lines.append(f"{sub_label}: R${sub_subtotal:.2f}")
+            lines.append(f"**{sub_label}**: R$ {sub_subtotal:.2f}")
             for it in items:
-                lines.append(f"{catalogo.formatar(it['nome'])} - {it['qtd']:.3f} x R${it['valor_unit']:.2f} = R${it['total']:.2f}")
+                lines.append(f"{catalogo.formatar(it['nome'])}\n    {it['qtd']:.3f} x R$ {it['valor_unit']:.2f} = R$ {it['total']:.2f}")
             lines.append("")  # linha em branco entre subcategorias
 
-        lines.append(f"Subtotal da categoria: R${cat_subtotal:.2f}")
-        textos.append("\n".join(lines))
+        lines.append(f"Subtotal da categoria: R$ {cat_subtotal:.2f}")
+        textos.append("\n".join(lines).replace("_", " "))
 
     return textos, total_cart
 
@@ -404,7 +403,7 @@ async def send_extrato_por_categoria(message: types.Message, itens, *,
         await send_text_in_chunks(message, t)
 
     # enviar total geral com teclado (se dado)
-    total_text = ("*" * 27) + "\n" + f"Valor Total do Carrinho: R${total:.2f}"
+    total_text = ("*" * 27) + "\n" + f"Valor Total do Carrinho: R$ {total:.2f}"
     await send_text_in_chunks(message, total_text, reply_markup=reply_markup, parse_mode=parse_mode)
 
 
