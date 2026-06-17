@@ -372,7 +372,7 @@ def dividir_extrato_por_categoria(itens):
             sub_subtotal = sum(it["total"] for it in items)
             lines.append(f"{sub_label.upper()}")
             for idx, it in enumerate(items, start=1):
-                lines.append(f"{idx:03d}   {catalogo.formatar(it['nome'])}\n    {it['qtd']:.3f} x R$ {it['valor_unit']:.2f} = R$ {it['total']:.2f}")
+                lines.append(f"{idx:03d}   {catalogo.formatar(it['nome'])}\n      {it['qtd']:.3f} x R$ {it['valor_unit']:.2f} = R$ {it['total']:.2f}")
             lines.append(f"➥ Total da subcategoria: R$ {sub_subtotal:.2f}")
             lines.append("")  # linha em branco entre subcategorias
 
