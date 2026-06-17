@@ -28,6 +28,9 @@ class MainState(StatesGroup):
     finalizando_mercado = State()
     historico_menu = State()
     historico_detalhe = State()
+    # novos estados para remoção de item
+    remover_escolher_categoria = State()
+    remover_informar_idx = State()
 
 
 # --- HELPERS ---
@@ -93,6 +96,8 @@ async def send_text_in_chunks(message: types.Message, text: str, *,
     Divide `text` em partes <= chunk_size respeitando quebras de linha quando possível.
     Anexa `reply_markup` somente ao último chunk (para evitar keyboards duplicados).
     """
+    if text is None:
+        return
     if not text:
         return await message.answer("", reply_markup=reply_markup)
 
@@ -247,7 +252,7 @@ def encontrar_caminho_produto(produto):
 def montar_extrato_carrinho(itens):
     """
     itens: lista de rows/dicts com campos: item_nome, quantidade, valor_unitario
-    Retorna string formatada conforme solicitado.
+    Retorna string formatada conforme solicitado, com numeração global 3 dígitos (001, 002, ...)
     """
     # agrupar: groups[cat][sub] = [itens]
     groups = {}
@@ -287,27 +292,30 @@ def montar_extrato_carrinho(itens):
             "total": total
         })
 
-    # montar texto
+    # montar texto com numeração global contínua (3 dígitos)
     lines = []
     lines.append("*" * 51)
+    global_idx = 1
     for cat, subdict in groups.items():
         # subtotal da categoria
         cat_subtotal = sum(it["total"] for items in subdict.values() for it in items)
-        lines.append(f"{cat.upper()}: R$ {cat_subtotal:.2f}")
+        lines.append(f"{cat.upper()}: R${cat_subtotal:.2f}")
         for sub, items in subdict.items():
             sub_label = "Geral" if sub == "_no_sub" else sub.title()
             sub_subtotal = sum(it["total"] for it in items)
-            lines.append(f"{sub_label}: R$ {sub_subtotal:.2f}")
+            lines.append(f"{sub_label}: R${sub_subtotal:.2f}")
             for it in items:
-                lines.append(f" ➥ {catalogo.formatar(it['nome'])}\n{it['qtd']:.3f} x {it['valor_unit']:.2f} = {it['total']:.2f}")
+                idx_label = f"{global_idx:03d}"
+                lines.append(f"{idx_label}. ➥ {catalogo.formatar(it['nome'])}: {it['qtd']:.3f} x R${it['valor_unit']:.2f} = R${it['total']:.2f}")
+                global_idx += 1
             lines.append("")  # linha em branco entre subcategorias
         lines.append("")  # linha em branco entre categorias
     lines.append("*" * 51)
-    lines.append(f"Valor Total do Carrinho: R$ {total_cart:.2f}")
-    return "\n".join(lines.replace("_", " "))
+    lines.append(f"Valor Total do Carrinho: R${total_cart:.2f}")
+    return "\n".join(lines)
 
 
-# --- NOVO: dividir extrato por categoria e enviar por categoria ---
+# --- dividir extrato por categoria e enviar por categoria ---
 def dividir_extrato_por_categoria(itens):
     """
     Recebe uma lista de itens (rows/dicts com item_nome, quantidade, valor_unitario)
@@ -317,9 +325,10 @@ def dividir_extrato_por_categoria(itens):
       NOME_DA_CATEGORIA
 
       Subcategoria: Subtotal
-      Item - qtd x valor = total
+      001. Item - qtd x valor = total
       ...
       Subtotal da categoria: R$xx.xx
+    Numeração global contínua (001,002,...)
     """
     groups = {}
     total_cart = 0.0
@@ -357,11 +366,14 @@ def dividir_extrato_por_categoria(itens):
         })
 
     textos = []
-    # opcional: ordenar categorias por nome (poderíamos ordenar por total decrescente se preferir)
+    # numeração global contínua entre categorias
+    global_idx = 1
+    # opcional: ordenar categorias por nome
     for cat in sorted(groups.keys()):
         subdict = groups[cat]
         lines = []
-        lines.append(f"{cat.upper()}")
+        lines.append("*" * 27)
+        lines.append(cat.upper())
         lines.append("")  # linha em branco
 
         # subtotal da categoria
@@ -370,14 +382,15 @@ def dividir_extrato_por_categoria(itens):
         for sub, items in subdict.items():
             sub_label = "Geral" if sub == "_no_sub" else sub.title()
             sub_subtotal = sum(it["total"] for it in items)
-            lines.append(f"{sub_label.upper()}")
-            for idx, it in enumerate(items, start=1):
-                lines.append(f"{idx:03d}   {catalogo.formatar(it['nome'])}\n      {it['qtd']:.3f} x R$ {it['valor_unit']:.2f} = R$ {it['total']:.2f}")
-            lines.append(f"➥ Total da subcategoria: R$ {sub_subtotal:.2f}")
+            lines.append(f"{sub_label}: R${sub_subtotal:.2f}")
+            for it in items:
+                idx_label = f"{global_idx:03d}"
+                lines.append(f"{idx_label}. {catalogo.formatar(it['nome'])} - {it['qtd']:.3f} x R${it['valor_unit']:.2f} = R${it['total']:.2f}")
+                global_idx += 1
             lines.append("")  # linha em branco entre subcategorias
 
-        lines.append(f"🧮 Total da categoria: R$ {cat_subtotal:.2f}")
-        textos.append("\n".join(lines).replace("_", " "))
+        lines.append(f"Subtotal da categoria: R${cat_subtotal:.2f}")
+        textos.append("\n".join(lines))
 
     return textos, total_cart
 
@@ -404,8 +417,62 @@ async def send_extrato_por_categoria(message: types.Message, itens, *,
         await send_text_in_chunks(message, t)
 
     # enviar total geral com teclado (se dado)
-    total_text = f"🛒 Valor Total do Carrinho: R$ {total:.2f}"
+    total_text = ("*" * 27) + "\n" + f"Valor Total do Carrinho: R${total:.2f}"
     await send_text_in_chunks(message, total_text, reply_markup=reply_markup, parse_mode=parse_mode)
+
+
+# --- Helpers para remoção: mapa global e grupos ---
+def _build_global_index_map_and_groups(itens):
+    """
+    itens: lista (rows/dicts) retornada por database.pegar_carrinho(...)
+    Retorna:
+      - global_map: dict {idx_int: {'pos': original_pos, 'cat':cat, 'sub':sub, 'item': {'nome','qtd','valor_unit','total'}}}
+      - groups: dict {cat: {sub: [ (pos,item_dict), ... ] } }
+    A numeração segue ordem por categoria (ordenada por nome) e pela ordem dos itens dentro da lista do DB.
+    """
+    groups = {}
+    total_cart = 0.0
+
+    for pos, r in enumerate(itens):
+        try:
+            nome = r["item_nome"]
+            qtd = float(r["quantidade"])
+            valor_unit = float(r["valor_unitario"])
+        except Exception:
+            try:
+                nome = r[1]
+                qtd = float(r[2])
+                valor_unit = float(r[3])
+            except Exception:
+                continue
+
+        total = qtd * valor_unit
+        total_cart += total
+
+        caminho = encontrar_caminho_produto(nome)
+        if caminho:
+            categoria = caminho[0]
+            subcategoria = caminho[1] if len(caminho) > 1 else None
+        else:
+            categoria = "Outros"
+            subcategoria = None
+
+        groups.setdefault(categoria, {}).setdefault(subcategoria or "_no_sub", []).append((
+            pos,
+            {"nome": nome, "qtd": qtd, "valor_unit": valor_unit, "total": total}
+        ))
+
+    # gerar mapa global_idx -> pos/item
+    global_map = {}
+    idx = 1
+    for cat in sorted(groups.keys()):
+        subdict = groups[cat]
+        for sub, items in subdict.items():
+            for pos, item in items:
+                global_map[idx] = {"pos": pos, "cat": cat, "sub": sub, "item": item}
+                idx += 1
+
+    return global_map, groups
 
 
 # --- HANDLERS ---
@@ -660,6 +727,198 @@ async def ver_carrinho(message: types.Message, state: FSMContext):
     await send_extrato_por_categoria(message, itens, reply_markup=kb_carrinho_menu())
 
 
+# ─── INICIAR REMOÇÃO: mostra categorias/subcategorias presentes no carrinho
+@dp.message(MainState.carrinho_menu, F.text == "🗑️ Remover Item")
+async def iniciar_remover_item(message: types.Message, state: FSMContext):
+    dep_id, *_ = await get_dep_data(state)
+    if not dep_id:
+        return await message.answer("Envie /start e escolha um departamento primeiro.")
+
+    try:
+        itens = await database.pegar_carrinho(message.from_user.id, dep_id)
+    except Exception:
+        traceback.print_exc()
+        return await message.answer("Erro ao recuperar o carrinho. Tente novamente.")
+
+    if not itens:
+        return await message.answer("Carrinho vazio!", reply_markup=kb_menu_compras())
+
+    global_map, groups = _build_global_index_map_and_groups(itens)
+
+    # construir teclado com entradas "Categoria / Subcategoria"
+    btns = []
+    label_map = {}  # label -> (cat, sub)
+    for cat in sorted(groups.keys()):
+        subdict = groups[cat]
+        for sub in subdict.keys():
+            sub_label = "Geral" if sub == "_no_sub" else sub.title()
+            label = f"{cat} / {sub_label}"
+            btns.append([KeyboardButton(text=label)])
+            label_map[label] = (cat, sub)
+
+    # adicionar botão de voltar
+    btns.append([KeyboardButton(text="⬅️ Voltar")])
+    kb = ReplyKeyboardMarkup(keyboard=btns, resize_keyboard=True)
+
+    # salvar mapa de labels e o global_map no estado (será usado no próximo passo)
+    await state.update_data(remover_label_map=label_map, remover_global_map={k: v for k, v in global_map.items()})
+    await state.set_state(MainState.remover_escolher_categoria)
+    await message.answer("Selecione a Categoria / Subcategoria do item que deseja remover:", reply_markup=kb)
+
+
+# ─── USUÁRIO ESCOLHE CATEGORIA/SUBCATEGORIA: mostrar itens com numeração (apenas dessa subcategoria)
+@dp.message(MainState.remover_escolher_categoria)
+async def remover_escolher_categoria_handler(message: types.Message, state: FSMContext):
+    text = message.text
+    if text == "⬅️ Voltar":
+        # voltar ao menu do carrinho
+        await state.set_state(MainState.carrinho_menu)
+        return await message.answer("🛒 Menu do Carrinho:", reply_markup=kb_carrinho_menu())
+
+    data = await state.get_data()
+    label_map = data.get("remover_label_map", {})
+    global_map = data.get("remover_global_map", {})
+
+    if text not in label_map:
+        return await message.answer("Escolha inválida. Selecione uma das opções mostradas.")
+
+    cat, sub = label_map[text]
+
+    # filtrar entradas do global_map que correspondem ao cat/sub selecionados
+    selected_entries = []
+    for idx_str, info in global_map.items():
+        # global_map keys are ints in our state; ensure we use ints
+        idx = int(idx_str) if isinstance(idx_str, str) else idx_str
+        if info["cat"] == cat and info["sub"] == sub:
+            selected_entries.append((idx, info))
+
+    if not selected_entries:
+        return await message.answer("Não há itens nessa subcategoria (talvez o carrinho mudou). Volte e tente novamente.", reply_markup=kb_carrinho_menu())
+
+    # montar texto com itens desta subcategoria (usando idx formatado com 3 dígitos)
+    lines = []
+    lines.append(f"Itens em: {cat} / {'Geral' if sub == '_no_sub' else sub.title()}")
+    lines.append("")
+    for idx, info in selected_entries:
+        it = info["item"]
+        idx_label = f"{idx:03d}"
+        lines.append(f"{idx_label}. {catalogo.formatar(it['nome'])} - {it['qtd']:.3f} x R${it['valor_unit']:.2f} = R${it['total']:.2f}")
+
+    lines.append("")
+    lines.append("Envie o número do item para remover (ex: 003) ou '⬅️ Voltar' para retornar.")
+    texto = "\n".join(lines)
+
+    # salvar o mapa reduzido para validação posterior (idx -> item detalhes)
+    remover_map_sel = {idx: info for idx, info in selected_entries}
+    await state.update_data(remover_chosen=(cat, sub), remover_choice_map={k: v for k, v in remover_map_sel.items()})
+    await state.set_state(MainState.remover_informar_idx)
+    # remover teclado (usuário digitará o número)
+    await message.answer(texto, reply_markup=ReplyKeyboardRemove())
+
+
+# ─── USUÁRIO INFORMA O IDX A REMOVER
+@dp.message(MainState.remover_informar_idx)
+async def remover_informar_idx_handler(message: types.Message, state: FSMContext):
+    text = message.text.strip()
+    if text == "⬅️ Voltar":
+        # voltar para escolher categoria/subcategoria novamente
+        data = await state.get_data()
+        label_map = data.get("remover_label_map", {})
+        btns = [[KeyboardButton(text=label)] for label in label_map.keys()]
+        btns.append([KeyboardButton(text="⬅️ Voltar")])
+        kb = ReplyKeyboardMarkup(keyboard=btns, resize_keyboard=True)
+        await state.set_state(MainState.remover_escolher_categoria)
+        return await message.answer("Selecione a Categoria / Subcategoria:", reply_markup=kb)
+
+    # aceitar formatos como "003" ou "3"
+    try:
+        idx_int = int(text)
+    except Exception:
+        # tentar remover zeros à esquerda
+        try:
+            idx_int = int(text.lstrip("0") or "0")
+        except Exception:
+            return await message.answer("Número inválido. Envie o número do item (ex: 003).")
+
+    data = await state.get_data()
+    remover_choice_map = data.get("remover_choice_map", {})
+    # validar se idx está disponível no mapa atual
+    if idx_int not in remover_choice_map:
+        return await message.answer("Número não encontrado entre os itens mostrados. Verifique e tente novamente ou envie '⬅️ Voltar'.")
+
+    target_info = remover_choice_map[idx_int]
+    target_item = target_info["item"]  # {nome, qtd, valor_unit, total}
+
+    dep_id, *_ = await get_dep_data(state)
+    try:
+        itens = await database.pegar_carrinho(message.from_user.id, dep_id)
+    except Exception:
+        traceback.print_exc()
+        return await message.answer("Erro ao recuperar o carrinho. Tente novamente.")
+
+    # localizar a primeira ocorrência que bate com nome, quantidade e valor_unit
+    found_pos = None
+    for pos, r in enumerate(itens):
+        try:
+            nome = r["item_nome"]
+            qtd = float(r["quantidade"])
+            valor_unit = float(r["valor_unitario"])
+        except Exception:
+            try:
+                nome = r[1]
+                qtd = float(r[2])
+                valor_unit = float(r[3])
+            except Exception:
+                continue
+
+        # comparar com tolerância em floats
+        if nome == target_item["nome"] and abs(qtd - float(target_item["qtd"])) < 1e-9 and abs(valor_unit - float(target_item["valor_unit"])) < 1e-9:
+            found_pos = pos
+            break
+
+    if found_pos is None:
+        # talvez o carrinho mudou; informar e pedir para recomeçar
+        await state.set_state(MainState.carrinho_menu)
+        return await message.answer("Não foi possível localizar o item no carrinho (o carrinho pode ter mudado). Por favor, abra o carrinho novamente.", reply_markup=kb_carrinho_menu())
+
+    # construir nova lista sem o item encontrado
+    nova_lista = []
+    for pos, r in enumerate(itens):
+        if pos == found_pos:
+            continue
+        # explicitar os campos ao re-adicionar
+        try:
+            nome = r["item_nome"]
+            qtd = float(r["quantidade"])
+            valor_unit = float(r["valor_unitario"])
+        except Exception:
+            # fallback por índice
+            nome = r[1]
+            qtd = float(r[2])
+            valor_unit = float(r[3])
+        nova_lista.append((nome, qtd, valor_unit))
+
+    # regravar o carrinho: limpar e re-adicionar
+    try:
+        await database.limpar_carrinho(message.from_user.id, dep_id)
+        for nome, qtd, valor_unit in nova_lista:
+            await database.adicionar_ao_carrinho(message.from_user.id, dep_id, nome, qtd, valor_unit)
+    except Exception:
+        traceback.print_exc()
+        return await message.answer("Erro ao atualizar o carrinho. Tente novamente mais tarde.")
+
+    await state.set_state(MainState.carrinho_menu)
+    # confirmar e enviar extrato atualizado
+    await message.answer(f"Item {idx_int:03d} removido com sucesso.", reply_markup=kb_carrinho_menu())
+    try:
+        itens_atual = await database.pegar_carrinho(message.from_user.id, dep_id)
+        await send_extrato_por_categoria(message, itens_atual, reply_markup=kb_carrinho_menu())
+    except Exception:
+        traceback.print_exc()
+        # em caso de falha ao mostrar extrato, apenas confirmar
+        await message.answer("Carrinho atualizado, mas não foi possível exibir o extrato no momento.")
+
+
 # ─── LIMPAR CARRINHO e CONFIRMAR AÇÕES ────
 @dp.message(MainState.carrinho_menu, F.text == "🧹 Limpar Carrinho")
 async def limpar_carrinho_menu(message: types.Message, state: FSMContext):
@@ -744,7 +1003,8 @@ async def finalizar_do_carrinho(message: types.Message, state: FSMContext):
     texto = "🛒 *Resumo do carrinho:*\n\n"
     total = 0
     itens_detalhe = []
-    for item in itens:
+    # numeração global no resumo também
+    for idx, item in enumerate(itens, start=1):
         # suportar dict/row
         try:
             nome = item["item_nome"]
@@ -756,7 +1016,8 @@ async def finalizar_do_carrinho(message: types.Message, state: FSMContext):
             valor_unit = item[3]
         sub = float(qtd) * float(valor_unit)
         total += sub
-        texto += f"• {nome}: {qtd}x R${float(valor_unit):.2f} = R${sub:.2f}\n"
+        idx_label = f"{idx:03d}"
+        texto += f"{idx_label}. {catalogo.formatar(nome)}: {qtd}x R${float(valor_unit):.2f} = R${sub:.2f}\n"
         itens_detalhe.append({"nome": nome, "quantidade": qtd, "valor_unitario": valor_unit})
 
     texto += f"\n💰 *Total: R${total:.2f}*\n\n🏪 Qual o nome do mercado?"
