@@ -459,6 +459,40 @@ async def pegar_itens_da_lista(lista_id):
     finally:
         await conn.close()
 
+async def pegar_itens_da_lista_com_categoria(lista_id):
+    """
+    Retorna os itens da lista com a categoria vinculada ao produto cadastrado.
+
+    Não altera a função pegar_itens_da_lista(), que continua retornando
+    somente os nomes dos itens para manter compatibilidade com os demais módulos.
+    """
+    conn = await get_conn()
+    try:
+        rows = await conn.fetch(
+            """
+            SELECT
+                li.id AS lista_item_id,
+                li.item_nome,
+                p.id AS produto_id,
+                c.nome AS categoria,
+                c.emoji AS categoria_emoji
+            FROM lista_itens li
+            INNER JOIN listas l
+                ON l.id = li.lista_id
+            LEFT JOIN produtos p
+                ON p.departamento_id = l.departamento_id
+                AND LOWER(TRIM(p.nome)) = LOWER(TRIM(li.item_nome))
+            LEFT JOIN categorias c
+                ON c.id = p.categoria_id
+            WHERE li.lista_id = $1
+            ORDER BY li.id
+            """,
+            lista_id,
+        )
+        return [dict(row) for row in rows]
+    finally:
+        await conn.close()
+
 
 async def remover_item_lista(lista_id, item_nome):
     conn = await get_conn()

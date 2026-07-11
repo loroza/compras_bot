@@ -120,76 +120,76 @@ def as_item_dict(item):
 
 def parse_item_label(raw):
     """
-    Converte item vindo de lista (string ou dict) para dict com chaves:
-    { 'item_nome', 'categoria', 'subcategoria', 'id' (opcional) }
+    Converte um item vindo da lista para um dicionário padronizado.
 
-    Heurísticas aceitas:
-    - Se for dict, retorna normalizado.
-    - Se for string, tenta extrair ID no prefixo "ID:123 | ..." (opcional).
-    - Remove sufixos após " — " (em dash) que normalmente contêm unidade/valor.
-    - Separa hierarquia por ">" (ex: "Categoria > Subcategoria > Nome").
-    - Fallback: item_nome = string inteira, categoria/subcategoria = None.
+    Formato retornado:
+    {
+        "item_nome": "...",
+        "categoria": "...",
+        "subcategoria": "...",
+        "id": ...
+    }
+
+    Aceita:
+    - Dicionários retornados pelo banco;
+    - Strings simples, como "Arroz";
+    - Strings com caminho, como "Alimentos > Grãos > Arroz";
+    - Strings com ID, como "ID:123 | Alimentos > Grãos > Arroz".
     """
-    if isinstance(raw, dict):
-        d = dict(raw)
-        # normalize common keys
-        item_nome = d.get("item_nome") or d.get("nome") or d.get("produto_nome") or d.get("name") or ""
+    if isinstance(raw, dict) or hasattr(raw, "keys"):
+        item = dict(raw)
+
         return {
-            "item_nome": item_nome,
-            "categoria": d.get("categoria") or d.get("cat"),
-            "subcategoria": d.get("subcategoria") or d.get("sub"),
-            "id": d.get("id")
+            "item_nome": (
+                item.get("item_nome")
+                or item.get("nome")
+                or item.get("produto_nome")
+                or item.get("name")
+                or ""
+            ),
+            "categoria": item.get("categoria") or item.get("categoria_nome") or item.get("cat"),
+            "subcategoria": item.get("subcategoria") or item.get("subcategoria_nome") or item.get("sub"),
+            "id": item.get("produto_id") or item.get("id"),
         }
 
-    # non-dict -> coerce to str
-    s = str(raw).strip()
-    id_val = None
+    texto = str(raw).strip()
+    produto_id = None
 
-    # tentar extrair ID: prefixo "ID:123 | rest..."
-    if s.lower().startswith("id:"):
+    if texto.lower().startswith("id:"):
         try:
-            parts = s.split("|", 1)
-            id_part = parts[0]
-            id_val = int(id_part.split(":", 1)[1].strip())
-            s = parts[1].strip() if len(parts) > 1 else ""
+            partes_id = texto.split("|", 1)
+            produto_id = int(partes_id[0].split(":", 1)[1].strip())
+            texto = partes_id[1].strip() if len(partes_id) > 1 else ""
         except Exception:
-            # se falhar, seguimos sem id
-            pass
+            produto_id = None
 
-    # remover sufixos após " — " (em dash) que costumam ser unidade/valor
-    if " — " in s:
-        left = s.split(" — ")[0]
-    else:
-        left = s
+    texto_principal = texto.split(" — ", 1)[0].strip()
 
-    # separar hierarquia por ">"
-    parts = [p.strip() for p in left.split(">")]
-    parts = [p for p in parts if p != ""]
+    partes = [
+        parte.strip()
+        for parte in texto_principal.split(">")
+        if parte.strip()
+    ]
 
     categoria = None
-    sub = None
-    nome = None
-    if len(parts) >= 3:
-        categoria = parts[0]
-        sub = parts[1]
-        nome = " > ".join(parts[2:])
-    elif len(parts) == 2:
-        categoria = parts[0]
-        nome = parts[1]
-    elif len(parts) == 1:
-        nome = parts[0]
-    else:
-        nome = left
+    subcategoria = None
+    item_nome = texto_principal
 
-    # fallback normalization
-    if nome is None or nome == "":
-        nome = s
+    if len(partes) >= 3:
+        categoria = partes[0]
+        subcategoria = partes[1]
+        item_nome = " > ".join(partes[2:])
+    elif len(partes) == 2:
+        categoria = partes[0]
+        item_nome = partes[1]
+    elif len(partes) == 1:
+        item_nome = partes[0]
 
     return {
-        "item_nome": nome,
+        "item_nome": item_nome,
         "categoria": categoria,
-        "subcategoria": sub,
-        "id": id_val
+        "subcategoria": subcategoria,
+        "id": produto_id,
     }
 
 
@@ -505,7 +505,7 @@ async def orc_novo_selecionar_lista_handler(message: types.Message, state: FSMCo
     if not lista_id:
         return await message.answer("Selecione uma lista válida.")
     await state.update_data(novo_lista_id=lista_id, novo_lista_nome=lista_nome)
-    itens = await database.pegar_itens_da_lista(lista_id)
+    itens = await database.pegar_itens_da_lista_com_categoria(lista_id)
     if not itens:
         return await message.answer("A lista selecionada não contém itens. Use outra lista ou adicione itens.", reply_markup=kb_voltar())
 
@@ -866,7 +866,7 @@ async def orc_editar_incluir_produto_handler(message: types.Message, state: FSMC
     lista_id = map_listas.get(message.text.strip())
     if not lista_id:
         return await message.answer("Selecione uma lista válida.")
-    itens = await database.pegar_itens_da_lista(lista_id)
+    itens = await database.pegar_itens_da_lista_com_categoria(lista_id)
     if not itens:
         return await message.answer("Lista vazia.")
     # salvar itens da lista e lista_id
@@ -1053,7 +1053,11 @@ async def orc_editar_incluir_produto_valor_handler(message: types.Message, state
         return await message.answer("Erro ao adicionar item. Tente novamente.")
 
     # não limpar a lista_id — vamos reabrir a seleção para adicionar mais itens da mesma lista
-    itens_da_lista = await database.pegar_itens_da_lista(lista_id) if lista_id else []
+    itens_da_lista = (
+        await database.pegar_itens_da_lista_com_categoria(lista_id)
+        if lista_id
+        else []
+    )
     existentes_rows = await listar_itens_orcamento(orc_id) if orc_id else []
     existentes = { normalize_label(r.get("item_nome")) for r in existentes_rows }
 
