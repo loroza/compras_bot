@@ -6,40 +6,8 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 
 import database  # deve expor helpers de conexão e funções como pegar_listas_disponiveis / pegar_itens_da_lista
-import catalogo   # para descobrir subcategorias no catálogo JSON
 
 router = Router()
-
-
-# --- Enriquecer itens da lista com subcategoria do catálogo ---
-def enrich_item_with_catalogo(item: dict) -> dict:
-    """
-    Recebe um item retornado por pegar_itens_da_lista_com_categoria
-    (que tem 'item_nome' e 'categoria' do banco) e acrescenta
-    'subcategoria' consultando o catálogo JSON.
-    """
-    resultado = dict(item)
-    nome = resultado.get("item_nome", "")
-    if not nome:
-        return resultado
-
-    try:
-        caminho = catalogo.encontrar_caminho_produto(nome)
-    except Exception:
-        caminho = None
-
-    if caminho and len(caminho) >= 3:
-        resultado["categoria"] = caminho[0]
-        resultado["subcategoria"] = caminho[1]
-        resultado["item_nome"] = caminho[-1]
-    elif caminho and len(caminho) == 2:
-        resultado["categoria"] = caminho[0]
-        resultado["subcategoria"] = "Sem subcategoria"
-        resultado["item_nome"] = caminho[-1]
-    else:
-        if not resultado.get("subcategoria"):
-            resultado["subcategoria"] = "Sem subcategoria"
-    return resultado
 
 # --- Estados ---
 class OrcState(StatesGroup):
@@ -169,7 +137,7 @@ def parse_item_label(raw):
     - Strings com ID, como "ID:123 | Alimentos > Grãos > Arroz".
     """
     if isinstance(raw, dict) or hasattr(raw, "keys"):
-        item = enrich_item_with_catalogo(dict(raw))
+        item = dict(raw)
 
         return {
             "item_nome": (
@@ -225,38 +193,22 @@ def parse_item_label(raw):
     }
 
 
+def somente_nome_produto(valor) -> str:
+    """Remove caminho de categoria, unidade e preço, preservando só o produto."""
+    texto = str(valor or "").strip()
+    if texto.startswith("ID:") and "|" in texto:
+        texto = texto.split("|", 1)[1].strip()
+    texto = texto.split(" — ", 1)[0].strip()
+    if ">" in texto:
+        texto = texto.rsplit(">", 1)[-1].strip()
+    return texto
+
+
 def build_product_label(prod):
-    """
-    Gera label hierárquico para produtos:
-    Categoria > Subcategoria > Produto — Unidade — R$X.XX
-
-    Esta versão usa parse_item_label para ser tolerante a strings vindas do DB.
-    """
-    prod = parse_item_label(prod) if not isinstance(prod, dict) or "categoria" not in prod else parse_item_label(prod)
-    nome = prod.get("item_nome") or prod.get("nome") or ""
-    categoria = prod.get("categoria") or ""
-    sub = prod.get("subcategoria") or ""
-    unidade = prod.get("unidade") or prod.get("un") or ""
-    valor = prod.get("valor_unitario")
-    valor_num = 0.0
-    try:
-        if valor is not None:
-            valor_num = float(valor)
-    except Exception:
-        valor_num = 0.0
-
-    parts = []
-    if categoria:
-        parts.append(categoria)
-    if sub:
-        parts.append(sub)
-    if nome:
-        parts.append(nome)
-    label = " > ".join(parts) if parts else nome or str(prod)
-    if unidade:
-        label = f"{label} — {unidade}"
-    label = f"{label} — R${valor_num:.2f}"
-    return label
+    """Gera o texto do botão exibindo somente o nome do produto."""
+    item = parse_item_label(prod)
+    nome = item.get("item_nome") or item.get("nome") or ""
+    return somente_nome_produto(nome)
 
 
 def build_orc_item_label(item_row):
@@ -455,16 +407,17 @@ async def orc_voltar_menu(message: types.Message, state: FSMContext):
 # ── Novo orçamento ──
 @router.message(OrcState.menu, F.text == "➕ Novo orçamento")
 async def orc_novo_inicio(message: types.Message, state: FSMContext):
-    await state.update_data(novo_itens=[])
-    await orc_novo_listas_prompt(message, state)
+    await state.set_state(OrcState.novo_tipo_loja)
+    await message.answer("Selecione o tipo de loja:", reply_markup=kb_tipoloja())
 
 
 @router.message(OrcState.novo_tipo_loja)
 async def orc_novo_tipo_loja_handler(message: types.Message, state: FSMContext):
     if message.text == "⬅️ Voltar":
-        return await orc_novo_listas_prompt(message, state)
+        await state.set_state(OrcState.menu)
+        return await message.answer("📊 Menu de Orçamentos:", reply_markup=kb_orcamentos_menu())
     tipo = "Física" if message.text.startswith("🏬") or message.text == "Física" else "E-commerce"
-    await state.update_data(novo_tipo_loja=tipo)
+    await state.update_data(novo_tipo_loja=tipo, novo_itens=[])
     await state.set_state(OrcState.novo_nome_loja)
     await message.answer("Nome da loja do orçamento:", reply_markup=ReplyKeyboardRemove())
 
@@ -681,9 +634,10 @@ async def orc_novo_produto_handler(message: types.Message, state: FSMContext):
         produto_key = chave
         chave = chave_raw
 
-    await state.update_data(novo_produto_label=chave, novo_produto=produto_key)
+    nome_produto = somente_nome_produto(chave)
+    await state.update_data(novo_produto_label=nome_produto, novo_produto=produto_key)
     await state.set_state(OrcState.novo_qtd)
-    await message.answer(f"Quantidade para {chave} (ex: 1, 1.5, 2):", reply_markup=ReplyKeyboardRemove())
+    await message.answer(f"Quantidade para {nome_produto} (ex: 1, 1.5, 2):", reply_markup=ReplyKeyboardRemove())
 
 
 @router.message(OrcState.novo_qtd)
@@ -1052,9 +1006,10 @@ async def orc_editar_incluir_produto_qtd_handler(message: types.Message, state: 
         prod_key = chosen
         chosen = chosen_raw
 
-    await state.update_data(editar_incluir_produto=chosen, editar_incluir_qtd=None)
+    nome_produto = somente_nome_produto(chosen)
+    await state.update_data(editar_incluir_produto=nome_produto, editar_incluir_qtd=None)
     await state.set_state(OrcState.editar_incluir_produto_valor)
-    await message.answer(f"Quantidade para {chosen}:", reply_markup=ReplyKeyboardRemove())
+    await message.answer(f"Quantidade para {nome_produto}:", reply_markup=ReplyKeyboardRemove())
 
 
 @router.message(OrcState.editar_incluir_produto_valor)
