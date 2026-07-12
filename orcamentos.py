@@ -23,24 +23,20 @@ def enrich_item_with_catalogo(item: dict) -> dict:
     if not nome:
         return resultado
 
-    # catalogo.encontrar_caminho_produto("Arroz") -> ["Alimentos", "Grãos", "Arroz"]
     try:
         caminho = catalogo.encontrar_caminho_produto(nome)
     except Exception:
         caminho = None
 
     if caminho and len(caminho) >= 3:
-        # categoria_raiz -> subcategoria -> produto
         resultado["categoria"] = caminho[0]
         resultado["subcategoria"] = caminho[1]
         resultado["item_nome"] = caminho[-1]
     elif caminho and len(caminho) == 2:
-        # categoria_raiz -> produto (sem subcategoria intermediária)
         resultado["categoria"] = caminho[0]
         resultado["subcategoria"] = "Sem subcategoria"
         resultado["item_nome"] = caminho[-1]
     else:
-        # não encontrado no catálogo — manter categoria do banco e colocar sub padrão
         if not resultado.get("subcategoria"):
             resultado["subcategoria"] = "Sem subcategoria"
     return resultado
@@ -459,17 +455,16 @@ async def orc_voltar_menu(message: types.Message, state: FSMContext):
 # ── Novo orçamento ──
 @router.message(OrcState.menu, F.text == "➕ Novo orçamento")
 async def orc_novo_inicio(message: types.Message, state: FSMContext):
-    await state.set_state(OrcState.novo_tipo_loja)
-    await message.answer("Selecione o tipo de loja:", reply_markup=kb_tipoloja())
+    await state.update_data(novo_itens=[])
+    await orc_novo_listas_prompt(message, state)
 
 
 @router.message(OrcState.novo_tipo_loja)
 async def orc_novo_tipo_loja_handler(message: types.Message, state: FSMContext):
     if message.text == "⬅️ Voltar":
-        await state.set_state(OrcState.menu)
-        return await message.answer("📊 Menu de Orçamentos:", reply_markup=kb_orcamentos_menu())
+        return await orc_novo_listas_prompt(message, state)
     tipo = "Física" if message.text.startswith("🏬") or message.text == "Física" else "E-commerce"
-    await state.update_data(novo_tipo_loja=tipo, novo_itens=[])
+    await state.update_data(novo_tipo_loja=tipo)
     await state.set_state(OrcState.novo_nome_loja)
     await message.answer("Nome da loja do orçamento:", reply_markup=ReplyKeyboardRemove())
 
