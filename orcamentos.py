@@ -696,9 +696,9 @@ async def orc_novo_produto_handler(message: types.Message, state: FSMContext):
                 idnum = int(chave.split(":")[1].strip())
                 for lbl, pk in prod_map.items():
                     if isinstance(pk, int) and pk == idnum:
-                    produto_key = pk
-                    chave = lbl
-                    break
+                        produto_key = pk
+                        chave = lbl
+                        break
             except Exception:
                 pass
 
