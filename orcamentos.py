@@ -5,10 +5,45 @@ from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemo
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 
-import catalogo
 import database  # deve expor helpers de conexão e funções como pegar_listas_disponiveis / pegar_itens_da_lista
+import catalogo   # para descobrir subcategorias no catálogo JSON
 
 router = Router()
+
+
+# --- Enriquecer itens da lista com subcategoria do catálogo ---
+def enrich_item_with_catalogo(item: dict) -> dict:
+    """
+    Recebe um item retornado por pegar_itens_da_lista_com_categoria
+    (que tem 'item_nome' e 'categoria' do banco) e acrescenta
+    'subcategoria' consultando o catálogo JSON.
+    """
+    resultado = dict(item)
+    nome = resultado.get("item_nome", "")
+    if not nome:
+        return resultado
+
+    # catalogo.encontrar_caminho_produto("Arroz") -> ["Alimentos", "Grãos", "Arroz"]
+    try:
+        caminho = catalogo.encontrar_caminho_produto(nome)
+    except Exception:
+        caminho = None
+
+    if caminho and len(caminho) >= 3:
+        # categoria_raiz -> subcategoria -> produto
+        resultado["categoria"] = caminho[0]
+        resultado["subcategoria"] = caminho[1]
+        resultado["item_nome"] = caminho[-1]
+    elif caminho and len(caminho) == 2:
+        # categoria_raiz -> produto (sem subcategoria intermediária)
+        resultado["categoria"] = caminho[0]
+        resultado["subcategoria"] = "Sem subcategoria"
+        resultado["item_nome"] = caminho[-1]
+    else:
+        # não encontrado no catálogo — manter categoria do banco e colocar sub padrão
+        if not resultado.get("subcategoria"):
+            resultado["subcategoria"] = "Sem subcategoria"
+    return resultado
 
 # --- Estados ---
 class OrcState(StatesGroup):
@@ -138,7 +173,7 @@ def parse_item_label(raw):
     - Strings com ID, como "ID:123 | Alimentos > Grãos > Arroz".
     """
     if isinstance(raw, dict) or hasattr(raw, "keys"):
-        item = dict(raw)
+        item = enrich_item_with_catalogo(dict(raw))
 
         return {
             "item_nome": (
@@ -195,10 +230,37 @@ def parse_item_label(raw):
 
 
 def build_product_label(prod):
-    """Exibe o nome do produto com a mesma formatação do módulo de compras."""
-    produto = parse_item_label(prod)
-    nome = produto.get("item_nome") or ""
-    return catalogo.formatar(nome)
+    """
+    Gera label hierárquico para produtos:
+    Categoria > Subcategoria > Produto — Unidade — R$X.XX
+
+    Esta versão usa parse_item_label para ser tolerante a strings vindas do DB.
+    """
+    prod = parse_item_label(prod) if not isinstance(prod, dict) or "categoria" not in prod else parse_item_label(prod)
+    nome = prod.get("item_nome") or prod.get("nome") or ""
+    categoria = prod.get("categoria") or ""
+    sub = prod.get("subcategoria") or ""
+    unidade = prod.get("unidade") or prod.get("un") or ""
+    valor = prod.get("valor_unitario")
+    valor_num = 0.0
+    try:
+        if valor is not None:
+            valor_num = float(valor)
+    except Exception:
+        valor_num = 0.0
+
+    parts = []
+    if categoria:
+        parts.append(categoria)
+    if sub:
+        parts.append(sub)
+    if nome:
+        parts.append(nome)
+    label = " > ".join(parts) if parts else nome or str(prod)
+    if unidade:
+        label = f"{label} — {unidade}"
+    label = f"{label} — R${valor_num:.2f}"
+    return label
 
 
 def build_orc_item_label(item_row):
@@ -397,12 +459,8 @@ async def orc_voltar_menu(message: types.Message, state: FSMContext):
 # ── Novo orçamento ──
 @router.message(OrcState.menu, F.text == "➕ Novo orçamento")
 async def orc_novo_inicio(message: types.Message, state: FSMContext):
-    # Fluxo ideal: 4 Lista → 5 Categoria/Subcategoria → 6 Produto → 7 Qtd/Valor → 1/2/3 Loja.
-    await state.update_data(
-        novo_itens=[], novo_tipo_loja=None, novo_nome_loja=None,
-        novo_descricao=None, novo_link=None, novo_lista_id=None
-    )
-    await orc_novo_listas_prompt(message, state)
+    await state.set_state(OrcState.novo_tipo_loja)
+    await message.answer("Selecione o tipo de loja:", reply_markup=kb_tipoloja())
 
 
 @router.message(OrcState.novo_tipo_loja)
@@ -439,8 +497,8 @@ async def orc_novo_descricao_handler(message: types.Message, state: FSMContext):
         await state.set_state(OrcState.novo_link)
         return await message.answer("Informe o link do site da loja (ou digite '-' se não tiver):", reply_markup=kb_voltar())
     else:
-        await state.set_state(OrcState.novo_confirmar)
-        return await message.answer("Dados da loja salvos.", reply_markup=kb_confirmar_cancelar())
+        await state.set_state(OrcState.novo_selecionar_lista)
+        return await orc_novo_listas_prompt(message, state)
 
 
 @router.message(OrcState.novo_link)
@@ -477,8 +535,8 @@ async def orc_novo_listas_prompt(message: types.Message, state: FSMContext):
 @router.message(OrcState.novo_selecionar_lista)
 async def orc_novo_selecionar_lista_handler(message: types.Message, state: FSMContext):
     if message.text == "⬅️ Voltar":
-        await state.set_state(OrcState.menu)
-        return await message.answer("📊 Menu de Orçamentos:", reply_markup=kb_orcamentos_menu())
+        await state.set_state(OrcState.novo_descricao)
+        return await message.answer("Descrição do orçamento (pode ser uma frase curta).", reply_markup=kb_voltar())
 
     data = await state.get_data()
     map_listas = data.get("novo_listas_objs", {})
@@ -655,19 +713,10 @@ async def orc_novo_valor_handler(message: types.Message, state: FSMContext):
     lista_itens = data.get("novo_itens", [])
     lista_itens.append({"item_nome": produto_label, "quantidade": data.get("novo_qtd", 1), "valor_unitario": valor})
     await state.update_data(novo_itens=lista_itens)
+    await state.set_state(OrcState.novo_confirmar)
     texto = "Item adicionado:\n"
     texto += f"• {produto_label} — {data.get('novo_qtd', 1)} x R${valor:.2f}\n\n"
     texto += f"Itens até agora: {len(lista_itens)}\n"
-
-    # Após o primeiro item, só então coleta os dados da loja: passos 1, 2 e 3.
-    if len(lista_itens) == 1 and not data.get("novo_tipo_loja"):
-        await state.set_state(OrcState.novo_tipo_loja)
-        return await message.answer(
-            texto + "Agora informe os dados da loja.\n\nSelecione o tipo de loja:",
-            reply_markup=kb_tipoloja(),
-        )
-
-    await state.set_state(OrcState.novo_confirmar)
     await message.answer(texto, reply_markup=kb_confirmar_cancelar())
 
 
