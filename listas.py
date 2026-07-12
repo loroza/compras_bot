@@ -1,41 +1,17 @@
-# listas.py (versão ajustada para exibir extrato do carrinho quando necessário)
-from aiogram import Router, types, F
+import json
+import os
+import time
+
+from aiogram import F, Router, types
 from aiogram.fsm.context import FSMContext
-from aiogram.fsm.state import StatesGroup, State
-from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
+from aiogram.fsm.state import State, StatesGroup
+from aiogram.types import KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove
+
 import catalogo
 import database
 
-import os
-import time
-import json
 
-# DEBUG: instrumentação para identificar handlers/instâncias que tratam cada mensagem
-print(f"[STARTUP] listas.py loaded PID={os.getpid()} ts={time.time():.3f}")
-
-
-async def _log_handler_entry(handler_name: str, message, state):
-    """
-    Chamar esta função como primeira linha de cada handler que queremos
-    instrumentar. Não altera comportamento, só imprime estado/usuario/texto.
-    """
-    try:
-        state_name = await state.get_state()
-        state_data = await state.get_data()
-    except Exception as e:
-        state_name = f"ERR:{e}"
-        state_data = {}
-    user_id = getattr(getattr(message, "from_user", None), "id", None)
-    text = getattr(message, "text", None)
-    try:
-        data_json = json.dumps(state_data, default=str, ensure_ascii=False)
-    except Exception:
-        data_json = str(state_data)
-    print(
-        f"[HANDLER] PID={os.getpid()} handler={handler_name} ts={time.time():.3f} "
-        f"user={user_id} text={text!r} state={state_name} data={data_json}"
-    )
-
+print(f"[STARTUP] listas.py carregado | PID={os.getpid()} | ts={time.time():.3f}")
 
 router = Router()
 
@@ -43,78 +19,252 @@ router = Router()
 class ListaState(StatesGroup):
     criando_tipo = State()
     criando_nome = State()
+
     escolhendo_lista = State()
     escolhendo_lista_remover = State()
+
     navegando_catalogo = State()
+    removendo_navegando = State()
+
     compra_navegando = State()
     compra_quantidade = State()
     compra_valor = State()
-    removendo_navegando = State()  # navegação para remover itens
-    finalizando_opcao = State()  # novo estado: escolher entre finalizar compra / finalizar lista
+
+    finalizando_opcao = State()
 
 
-# --- KEYBOARDS ---
+# ============================================================
+# LOG / DEBUG
+# ============================================================
+
+async def log_handler(handler_name: str, message: types.Message, state: FSMContext):
+    """
+    Registro simples para identificar qual handler está tratando
+    cada mensagem e qual estado estava ativo.
+    """
+    try:
+        state_name = await state.get_state()
+        state_data = await state.get_data()
+    except Exception as erro:
+        state_name = f"ERRO_AO_LER_ESTADO: {erro}"
+        state_data = {}
+
+    user_id = getattr(getattr(message, "from_user", None), "id", None)
+    texto = getattr(message, "text", None)
+
+    try:
+        dados_json = json.dumps(
+            state_data,
+            default=str,
+            ensure_ascii=False,
+        )
+    except Exception:
+        dados_json = str(state_data)
+
+    print(
+        f"[HANDLER] "
+        f"PID={os.getpid()} "
+        f"handler={handler_name} "
+        f"ts={time.time():.3f} "
+        f"user={user_id} "
+        f"text={texto!r} "
+        f"state={state_name} "
+        f"data={dados_json}"
+    )
+
+
+# ============================================================
+# KEYBOARDS
+# ============================================================
+
 def kb_menu():
+    """
+    Menu auxiliar de compras.
+    O menu principal oficial continua sendo montado pelo main.py.
+    """
     return ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text="🛒 Compra Avulsa"), KeyboardButton(text="📋 Minhas Listas")],
-            [KeyboardButton(text="📦 Ver Carrinho"), KeyboardButton(text="🏁 Finalizar")],
+            [
+                KeyboardButton(text="🛒 Compra Avulsa"),
+                KeyboardButton(text="📋 Minhas Listas"),
+            ],
+            [
+                KeyboardButton(text="📦 Ver Carrinho"),
+                KeyboardButton(text="🏁 Finalizar"),
+            ],
+        ],
+        resize_keyboard=True,
+    )
+
+
+def kb_menu_principal():
+    """
+    Replica o menu principal sem importar main.py,
+    evitando dependência circular entre main.py e listas.py.
+    """
+    return ReplyKeyboardMarkup(
+        keyboard=[
+            [
+                KeyboardButton(text="🛒 Compras"),
+                KeyboardButton(text="📲 Cadastros"),
+            ],
+            [
+                KeyboardButton(text="📜 Histórico"),
+                KeyboardButton(text="🔄 Trocar Departamento"),
+            ],
+        ],
+        resize_keyboard=True,
+    )
+
+
+def kb_compras():
+    return ReplyKeyboardMarkup(
+        keyboard=[
+            [
+                KeyboardButton(text="🛒 Compra Avulsa"),
+                KeyboardButton(text="📋 Minhas Listas"),
+            ],
+            [
+                KeyboardButton(text="📦 Ver Carrinho"),
+            ],
+            [
+                KeyboardButton(text="⬅️ Menu Principal"),
+            ],
         ],
         resize_keyboard=True,
     )
 
 
 def kb_listas_menu(allow_iniciar: bool = True):
-    rows = [
+    """
+    Menu de gerenciamento de listas dentro de Cadastros.
+    """
+    linhas = [
         [KeyboardButton(text="➕ Nova Lista")],
         [KeyboardButton(text="📝 Adicionar Itens")],
     ]
+
     if allow_iniciar:
-        rows[-1].append(KeyboardButton(text="🚀 Iniciar Compra"))
+        linhas[-1].append(KeyboardButton(text="🚀 Iniciar Compra"))
 
-    rows.append([KeyboardButton(text="🗑️ Remover Item"), KeyboardButton(text="⬅️ Menu Principal")])
-    return ReplyKeyboardMarkup(keyboard=rows, resize_keyboard=True)
+    linhas.append(
+        [
+            KeyboardButton(text="🗑️ Remover Item"),
+            KeyboardButton(text="⬅️ Menu Principal"),
+        ]
+    )
+
+    return ReplyKeyboardMarkup(
+        keyboard=linhas,
+        resize_keyboard=True,
+    )
 
 
-def kb_opcoes(lista, voltar: bool = True):
-    btns = [[KeyboardButton(text=catalogo.formatar(opt))] for opt in lista]
+def kb_opcoes(opcoes, voltar: bool = True):
+    """
+    Cria uma lista vertical de opções do catálogo.
+    """
+    botoes = []
+
+    for opcao in opcoes:
+        botoes.append(
+            [KeyboardButton(text=catalogo.formatar(opcao))]
+        )
+
     if voltar:
-        btns.append([KeyboardButton(text="⬅️ Voltar")])
-    return ReplyKeyboardMarkup(keyboard=btns, resize_keyboard=True)
+        botoes.append([KeyboardButton(text="⬅️ Voltar")])
+
+    return ReplyKeyboardMarkup(
+        keyboard=botoes,
+        resize_keyboard=True,
+    )
 
 
 def kb_lista_escolha(listas):
-    btns = [[KeyboardButton(text=l["nome"])] for l in listas]
-    btns.append([KeyboardButton(text="⬅️ Voltar")])
-    return ReplyKeyboardMarkup(keyboard=btns, resize_keyboard=True)
+    """
+    Mostra as listas disponíveis para o departamento selecionado.
+    """
+    botoes = []
+
+    for lista in listas:
+        botoes.append(
+            [KeyboardButton(text=lista["nome"])]
+        )
+
+    botoes.append([KeyboardButton(text="⬅️ Voltar")])
+
+    return ReplyKeyboardMarkup(
+        keyboard=botoes,
+        resize_keyboard=True,
+    )
 
 
 def kb_tipo_lista():
     return ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text="Avulsa"), KeyboardButton(text="Fixa")],
-            [KeyboardButton(text="⬅️ Voltar")]
+            [
+                KeyboardButton(text="Avulsa"),
+                KeyboardButton(text="Fixa"),
+            ],
+            [
+                KeyboardButton(text="⬅️ Voltar"),
+            ],
         ],
         resize_keyboard=True,
     )
 
 
-# --- HELPERS ---
+def kb_final_lista_fixa():
+    return ReplyKeyboardMarkup(
+        keyboard=[
+            [
+                KeyboardButton(text="Finalizar compra"),
+                KeyboardButton(text="Finalizar lista"),
+            ],
+        ],
+        resize_keyboard=True,
+    )
+
+
+# ============================================================
+# HELPERS DE ESTADO
+# ============================================================
+
 async def get_dep_from_state(state: FSMContext):
+    """
+    Retorna:
+        departamento_id,
+        departamento_nome
+    """
     data = await state.get_data()
-    return data.get("departamento_id"), data.get("departamento_nome")
+
+    return (
+        data.get("departamento_id"),
+        data.get("departamento_nome"),
+    )
 
 
 async def limpar_estado_preservando_departamento(state: FSMContext):
+    """
+    Limpa o FSM sem perder o departamento atualmente selecionado.
+    """
     data = await state.get_data()
-    preserved = {
-        k: data.get(k)
-        for k in ("departamento_id", "departamento_nome", "departamento_emoji", "catalogo_json")
-        if data.get(k) is not None
+
+    dados_preservados = {
+        chave: data.get(chave)
+        for chave in (
+            "departamento_id",
+            "departamento_nome",
+            "departamento_emoji",
+            "catalogo_json",
+        )
+        if data.get(chave) is not None
     }
+
     await state.clear()
-    if preserved:
-        await state.set_data(preserved)
+
+    if dados_preservados:
+        await state.set_data(dados_preservados)
 
 
 def montar_extrato_texto(itens: list) -> str:
@@ -122,823 +272,1378 @@ def montar_extrato_texto(itens: list) -> str:
 
 
 def encontrar_item_raw_por_label(itens: list, label: str):
+    """
+    Recebe o texto formatado mostrado no botão e retorna o nome raw,
+    usado internamente no catálogo e banco.
+    """
     for item in itens:
         if catalogo.formatar(item) == label:
             return item
+
     return None
 
 
-# --- HELPERS LOCAIS: montar extrato do carrinho (similar ao main.montar_extrato_carrinho)
 def montar_extrato_carrinho_local(itens):
+    """
+    Extrato local para o carrinho, evitando importar funções de main.py.
+    """
     if not itens:
         return "Carrinho vazio."
-    lines = []
+
+    agrupados = {}
     total = 0.0
-    # agrupa por item_name
-    agg = {}
-    for r in itens:
+
+    for registro in itens:
         try:
-            nome = r["item_nome"]
-            qtd = float(r["quantidade"] or 0)
-            valor = float(r["valor_unitario"] or 0)
+            nome = registro["item_nome"]
+            quantidade = float(registro["quantidade"] or 0)
+            valor = float(registro["valor_unitario"] or 0)
         except Exception:
-            nome = r[1]
-            qtd = float(r[2] or 0)
-            valor = float(r[3] or 0)
-        if nome in agg:
-            agg[nome]["qtd"] += qtd
+            nome = registro[1]
+            quantidade = float(registro[2] or 0)
+            valor = float(registro[3] or 0)
+
+        if nome not in agrupados:
+            agrupados[nome] = {
+                "quantidade": quantidade,
+                "valor": valor,
+            }
         else:
-            agg[nome] = {"qtd": qtd, "valor": valor}
-    for nome, v in agg.items():
-        subtotal = v["qtd"] * v["valor"]
+            agrupados[nome]["quantidade"] += quantidade
+
+    linhas = []
+
+    for nome, dados in agrupados.items():
+        quantidade = dados["quantidade"]
+        valor = dados["valor"]
+        subtotal = quantidade * valor
         total += subtotal
-        lines.append(f"• {catalogo.formatar(nome)}: {v['qtd']:.3f}x R${v['valor']:.2f} = R${subtotal:.2f}")
-    lines.append(f"\nValor Total do Carrinho: R${total:.2f}")
-    return "\n".join(lines)
+
+        linhas.append(
+            f"• {catalogo.formatar(nome)}: "
+            f"{quantidade:.3f}x "
+            f"R${valor:.2f} "
+            f"= R${subtotal:.2f}"
+        )
+
+    linhas.append(f"\nValor Total do Carrinho: R${total:.2f}")
+
+    return "\n".join(linhas)
 
 
-# --- CATALOG NAV HELPERS ---
+# ============================================================
+# HELPERS DE NAVEGAÇÃO DO CATÁLOGO
+# ============================================================
+
 def _buscar_produto_recursivo(no, produto):
+    """
+    Verifica se determinado produto existe dentro de um nó do catálogo,
+    inclusive dentro de subcategorias, grupos e estruturas aninhadas.
+    """
     if isinstance(no, dict):
         produtos = no.get("produtos")
+
         if isinstance(produtos, list) and produto in produtos:
             return True
-        for chave in ("subcategorias", "grupos"):
-            sub = no.get(chave)
-            if isinstance(sub, dict):
-                for sk, sn in sub.items():
-                    if _buscar_produto_recursivo(sn, produto):
+
+        for chave_container in ("subcategorias", "grupos"):
+            subcategorias = no.get(chave_container)
+
+            if isinstance(subcategorias, dict):
+                for sub_no in subcategorias.values():
+                    if _buscar_produto_recursivo(sub_no, produto):
                         return True
-        for k, v in no.items():
-            if k in ("produtos", "subcategorias", "grupos"):
+
+        for chave, valor in no.items():
+            if chave in ("produtos", "subcategorias", "grupos"):
                 continue
-            if isinstance(v, dict) and _buscar_produto_recursivo(v, produto):
-                return True
-    elif isinstance(no, list):
+
+            if isinstance(valor, dict):
+                if _buscar_produto_recursivo(valor, produto):
+                    return True
+
+            if isinstance(valor, list):
+                if produto in valor:
+                    return True
+
+                for elemento in valor:
+                    if isinstance(elemento, dict):
+                        if _buscar_produto_recursivo(elemento, produto):
+                            return True
+
+        return False
+
+    if isinstance(no, list):
         return produto in no
+
     return False
 
 
 def categorias_para_itens(itens):
-    cats = []
-    seen = set()
-    for prod in itens:
-        for cat_key, cat_node in catalogo.CATALOGO.items():
-            if _buscar_produto_recursivo(cat_node, prod):
-                if cat_key not in seen:
-                    cats.append(cat_key)
-                    seen.add(cat_key)
+    """
+    Retorna somente as categorias raiz que contêm algum dos itens informados.
+    """
+    categorias = []
+    categorias_vistas = set()
+
+    for produto in itens:
+        for categoria, no_categoria in catalogo.CATALOGO.items():
+            if _buscar_produto_recursivo(no_categoria, produto):
+                if categoria not in categorias_vistas:
+                    categorias.append(categoria)
+                    categorias_vistas.add(categoria)
+
                 break
-    if not cats:
+
+    if not categorias:
         return list(catalogo.CATALOGO.keys())
-    return cats
+
+    return categorias
 
 
 def _obter_no_por_caminho(caminho):
+    """
+    Navega diretamente em CATALOGO usando um caminho de chaves.
+    Compatível com subcategorias, grupos e chaves diretas.
+    """
     if not caminho:
         return None
-    node = catalogo.CATALOGO
-    for seg in caminho:
-        if not isinstance(node, dict):
+
+    no_atual = catalogo.CATALOGO
+
+    for segmento in caminho:
+        if not isinstance(no_atual, dict):
             return None
-        found = None
+
+        encontrado = None
+
         for container in ("subcategorias", "grupos"):
-            cont = node.get(container)
-            if isinstance(cont, dict) and seg in cont:
-                found = cont[seg]
+            conteudo = no_atual.get(container)
+
+            if isinstance(conteudo, dict) and segmento in conteudo:
+                encontrado = conteudo[segmento]
                 break
-        if found is None and seg in node:
-            found = node[seg]
-        if found is None:
+
+        if encontrado is None and segmento in no_atual:
+            encontrado = no_atual[segmento]
+
+        if encontrado is None:
             return None
-        node = found
-    return node
+
+        no_atual = encontrado
+
+    return no_atual
 
 
-# helper: coleta todos os produtos definidos no catálogo (chaves "raw")
 def _coletar_todos_produtos():
+    """
+    Coleta os nomes raw de todos os produtos presentes no catálogo.
+    """
     produtos = set()
 
-    def _rec(no):
+    def percorrer(no):
         if isinstance(no, dict):
-            p = no.get("produtos")
-            if isinstance(p, list):
-                for it in p:
-                    produtos.add(it)
-            for k, v in no.items():
-                if isinstance(v, dict):
-                    _rec(v)
-                elif isinstance(v, list):
-                    for elem in v:
-                        if isinstance(elem, dict):
-                            _rec(elem)
-        elif isinstance(no, list):
-            for elem in no:
-                if isinstance(elem, dict):
-                    _rec(elem)
+            itens = no.get("produtos")
 
-    _rec(catalogo.CATALOGO)
+            if isinstance(itens, list):
+                for item in itens:
+                    if isinstance(item, str):
+                        produtos.add(item)
+
+            for valor in no.values():
+                if isinstance(valor, dict):
+                    percorrer(valor)
+
+                elif isinstance(valor, list):
+                    for elemento in valor:
+                        if isinstance(elemento, dict):
+                            percorrer(elemento)
+
+        elif isinstance(no, list):
+            for elemento in no:
+                if isinstance(elemento, dict):
+                    percorrer(elemento)
+
+    percorrer(catalogo.CATALOGO)
+
     return produtos
 
 
 def opcoes_filtradas_para_itens(caminho, itens):
     """
-    Retorna opções (categorias/subcategorias/produtos) filtradas
-    apenas para os produtos que estão na lista `itens`.
-    """
-    # normaliza itens vindos do banco para chaves raw do catálogo
-    all_products = _coletar_todos_produtos()
-    # mapa label_formatada.lower() -> raw
-    formatted_map = {catalogo.formatar(p).lower(): p for p in all_products}
+    Mostra somente categorias, grupos, subcategorias ou produtos que levam
+    aos itens efetivamente existentes na lista.
 
-    raw_items = set()
-    for it in itens:
-        if it in all_products:
-            raw_items.add(it)
+    Isso é usado principalmente no fluxo de:
+    - iniciar compra de uma lista;
+    - remover item de uma lista.
+
+    No fluxo de adicionar itens, o catálogo completo é mostrado.
+    """
+    todos_os_produtos = _coletar_todos_produtos()
+
+    mapa_formatado = {
+        catalogo.formatar(produto).lower(): produto
+        for produto in todos_os_produtos
+    }
+
+    itens_raw = set()
+
+    for item in itens:
+        if item in todos_os_produtos:
+            itens_raw.add(item)
             continue
-        key = str(it).strip()
-        low = key.lower()
-        if low in formatted_map:
-            raw_items.add(formatted_map[low])
+
+        texto = str(item).strip()
+        texto_lower = texto.lower()
+
+        if texto_lower in mapa_formatado:
+            itens_raw.add(mapa_formatado[texto_lower])
             continue
-        # tentativa extra: correspondência por igualdade simples ignorando case
-        for fm_label, raw in formatted_map.items():
-            if fm_label == low:
-                raw_items.add(raw)
+
+        for label_formatado, raw in mapa_formatado.items():
+            if label_formatado == texto_lower:
+                itens_raw.add(raw)
                 break
 
-    # se raw_items estiver vazio, manter comportamento padrão
     if not caminho:
-        # categorias que contêm algum produto da lista
-        cats = []
-        seen = set()
-        for prod in raw_items:
-            for cat_key, cat_node in catalogo.CATALOGO.items():
-                if _buscar_produto_recursivo(cat_node, prod):
-                    if cat_key not in seen:
-                        cats.append(cat_key)
-                        seen.add(cat_key)
-                    break
-        if not cats:
-            return list(catalogo.CATALOGO.keys())
-        return cats
+        categorias = []
+        vistas = set()
 
-    node = _obter_no_por_caminho(caminho)
-    if node is None:
+        for produto in itens_raw:
+            for categoria, no_categoria in catalogo.CATALOGO.items():
+                if _buscar_produto_recursivo(no_categoria, produto):
+                    if categoria not in vistas:
+                        categorias.append(categoria)
+                        vistas.add(categoria)
+
+                    break
+
+        if not categorias:
+            return list(catalogo.CATALOGO.keys())
+
+        return categorias
+
+    no = _obter_no_por_caminho(caminho)
+
+    if no is None:
         return catalogo.obter_opcoes(caminho)
 
-    opts = []
-    seen = set()
+    if not isinstance(no, dict):
+        return catalogo.obter_opcoes(caminho)
 
-    produtos = node.get("produtos")
-    if isinstance(produtos, list):
-        for p in produtos:
-            if p in raw_items and p not in seen:
-                opts.append(p)
-                seen.add(p)
+    opcoes = []
+    vistas = set()
+
+    produtos_diretos = no.get("produtos")
+
+    if isinstance(produtos_diretos, list):
+        for produto in produtos_diretos:
+            if produto in itens_raw and produto not in vistas:
+                opcoes.append(produto)
+                vistas.add(produto)
 
     for container in ("subcategorias", "grupos"):
-        cont = node.get(container)
-        if isinstance(cont, dict):
-            for sk, sn in cont.items():
-                # se algum produto raw da lista existir recursivamente neste subnó
-                if any(_buscar_produto_recursivo(sn, prod) for prod in raw_items):
-                    if sk not in seen:
-                        opts.append(sk)
-                        seen.add(sk)
+        conteudo = no.get(container)
 
-    for k, v in node.items():
-        if k in ("produtos", "subcategorias", "grupos"):
+        if not isinstance(conteudo, dict):
             continue
-        if isinstance(v, dict):
-            if any(_buscar_produto_recursivo(v, prod) for prod in raw_items):
-                if k not in seen:
-                    opts.append(k)
-                    seen.add(k)
 
-    if not opts:
+        for nome_subcategoria, no_subcategoria in conteudo.items():
+            contem_item = any(
+                _buscar_produto_recursivo(no_subcategoria, produto)
+                for produto in itens_raw
+            )
+
+            if contem_item and nome_subcategoria not in vistas:
+                opcoes.append(nome_subcategoria)
+                vistas.add(nome_subcategoria)
+
+    for chave, valor in no.items():
+        if chave in ("produtos", "subcategorias", "grupos"):
+            continue
+
+        if not isinstance(valor, dict):
+            continue
+
+        contem_item = any(
+            _buscar_produto_recursivo(valor, produto)
+            for produto in itens_raw
+        )
+
+        if contem_item and chave not in vistas:
+            opcoes.append(chave)
+            vistas.add(chave)
+
+    if not opcoes:
         return catalogo.obter_opcoes(caminho)
 
-    return opts
+    return opcoes
 
+
+# ============================================================
+# RETORNOS DE MENU
+# ============================================================
 
 async def voltar_para_origem(message: types.Message, state: FSMContext):
+    """
+    Devolve o usuário para o menu de origem:
+    - compras;
+    - gerenciamento/cadastros.
+    """
     data = await state.get_data()
-    origin = data.get("menu_origin", "cadastro")
-    dep_id, _ = await get_dep_from_state(state)
+    origem = data.get("menu_origin", "cadastro")
 
-    if origin == "compras":
+    if origem == "compras":
         await limpar_estado_preservando_departamento(state)
-        kb_compras = ReplyKeyboardMarkup(
-            keyboard=[
-                [KeyboardButton(text="🛒 Compra Avulsa"), KeyboardButton(text="📋 Minhas Listas")],
-                [KeyboardButton(text="📦 Ver Carrinho")],
-                [KeyboardButton(text="⬅️ Menu Principal")],
-            ],
-            resize_keyboard=True,
+
+        return await message.answer(
+            "🛒 Menu de Compras:",
+            reply_markup=kb_compras(),
         )
-        return await message.answer("🛒 Menu de Compras:", reply_markup=kb_compras)
-    else:
-        # volta para gestão de listas (cadastros)
-        await state.set_state(ListaState.escolhendo_lista)
-        await state.update_data(acao="iniciar_compra", menu_origin="compras")
-        listas = await database.pegar_listas_disponiveis(dep_id) if dep_id else []
-        return await message.answer("Selecione a lista para iniciar a compra:", reply_markup=kb_lista_escolha(listas))
+
+    await limpar_estado_preservando_departamento(state)
+
+    return await message.answer(
+        "📋 Gerenciar Listas:",
+        reply_markup=kb_listas_menu(allow_iniciar=False),
+    )
 
 
-# Função faltante: inicia o fluxo de remoção (corrige NameError)
-async def remover_item_start(message: types.Message, state: FSMContext):
+async def iniciar_selecao_lista_para_compra(
+    message: types.Message,
+    state: FSMContext,
+    origem: str = "compras",
+):
+    """
+    Abre a seleção de lista para iniciar uma compra.
+    """
     dep_id, _ = await get_dep_from_state(state)
+
     if not dep_id:
-        return await message.answer("Envie /start e escolha o departamento primeiro.")
+        return await message.answer(
+            "Envie /start e escolha um departamento primeiro."
+        )
+
     listas = await database.pegar_listas_disponiveis(dep_id)
+
     if not listas:
-        return await message.answer("Não há listas.", reply_markup=kb_listas_menu(allow_iniciar=False))
+        return await message.answer(
+            "Não há listas disponíveis. Crie uma lista primeiro!",
+            reply_markup=kb_listas_menu(allow_iniciar=False),
+        )
+
+    await state.set_state(ListaState.escolhendo_lista)
+    await state.update_data(
+        acao="iniciar_compra",
+        menu_origin=origem,
+    )
+
+    return await message.answer(
+        "Selecione a lista para iniciar a compra:",
+        reply_markup=kb_lista_escolha(listas),
+    )
+
+
+async def remover_item_start(message: types.Message, state: FSMContext):
+    """
+    Inicia o fluxo de escolher uma lista para remover itens.
+    """
+    dep_id, _ = await get_dep_from_state(state)
+
+    if not dep_id:
+        return await message.answer(
+            "Envie /start e escolha o departamento primeiro."
+        )
+
+    listas = await database.pegar_listas_disponiveis(dep_id)
+
+    if not listas:
+        return await message.answer(
+            "Não há listas disponíveis.",
+            reply_markup=kb_listas_menu(allow_iniciar=False),
+        )
+
     await state.set_state(ListaState.escolhendo_lista_remover)
-    await state.update_data(menu_origin="cadastro", acao="remover")
-    return await message.answer("Selecione a lista para remover itens:", reply_markup=kb_lista_escolha(listas))
+    await state.update_data(
+        menu_origin="cadastro",
+        acao="remover",
+    )
+
+    return await message.answer(
+        "Selecione a lista para remover itens:",
+        reply_markup=kb_lista_escolha(listas),
+    )
 
 
-# --- HANDLERS ---
+# ============================================================
+# HANDLERS GERAIS
+# ============================================================
 
 @router.message(F.text == "🏁 Finalizar")
 async def finalizar_fluxo(message: types.Message, state: FSMContext):
-    await state.clear()
-    await message.answer("Fluxo finalizado.", reply_markup=kb_menu())
+    await limpar_estado_preservando_departamento(state)
 
+    await message.answer(
+        "Fluxo finalizado.",
+        reply_markup=kb_menu(),
+    )
+
+
+@router.message(F.text == "⬅️ Menu Principal")
+async def voltar_menu_principal(message: types.Message, state: FSMContext):
+    await limpar_estado_preservando_departamento(state)
+
+    await message.answer(
+        "Menu principal:",
+        reply_markup=kb_menu_principal(),
+    )
+
+
+# ============================================================
+# ENTRADAS PARA LISTAS
+# ============================================================
 
 @router.message(F.text == "📋 Minhas Listas")
 async def listas_minhas_compras(message: types.Message, state: FSMContext):
-    dep_id, _ = await get_dep_from_state(state)
-    if not dep_id:
-        return await message.answer("Envie /start e escolha um departamento primeiro.")
-    listas = await database.pegar_listas_disponiveis(dep_id)
-    if not listas:
-        return await message.answer("Não há listas. Crie uma lista primeiro!", reply_markup=kb_listas_menu(allow_iniciar=False))
-    await state.set_state(ListaState.escolhendo_lista)
-    await state.update_data(acao="iniciar_compra", menu_origin="compras")
-    await message.answer("Selecione a lista para iniciar a compra:", reply_markup=kb_lista_escolha(listas))
+    await iniciar_selecao_lista_para_compra(
+        message=message,
+        state=state,
+        origem="compras",
+    )
+
+
+@router.message(F.text == "🚀 Iniciar Compra")
+async def iniciar_compra_por_lista(message: types.Message, state: FSMContext):
+    await iniciar_selecao_lista_para_compra(
+        message=message,
+        state=state,
+        origem="cadastro",
+    )
 
 
 @router.message(F.text == "📋 Listas")
 async def listas_cadastros_manager(message: types.Message, state: FSMContext):
     dep_id, _ = await get_dep_from_state(state)
+
     if not dep_id:
-        return await message.answer("Envie /start e escolha um departamento primeiro.")
+        return await message.answer(
+            "Envie /start e escolha um departamento primeiro."
+        )
+
     await state.set_state(ListaState.escolhendo_lista)
-    await state.update_data(menu_origin="cadastro")
-    await message.answer("Gerenciar Listas:", reply_markup=kb_listas_menu(allow_iniciar=False))
-
-
-@router.message(F.text == "⬅️ Menu Principal")
-async def back_main(message: types.Message, state: FSMContext):
-    """
-    Volta explicitamente para o menu principal (mostrando o mesmo teclado do main.py),
-    preservando o departamento.
-    """
-    await limpar_estado_preservando_departamento(state)
-    kb = ReplyKeyboardMarkup(
-        keyboard=[
-            [KeyboardButton(text="🛒 Compras"), KeyboardButton(text="📲 Cadastros")],
-            [KeyboardButton(text="📜 Histórico"), KeyboardButton(text="🔄 Trocar Departamento")],
-        ],
-        resize_keyboard=True,
+    await state.update_data(
+        menu_origin="cadastro",
+        acao=None,
     )
-    await message.answer("Menu principal:", reply_markup=kb)
 
+    await message.answer(
+        "📋 Gerenciar Listas:",
+        reply_markup=kb_listas_menu(allow_iniciar=False),
+    )
+
+
+# ============================================================
+# CRIAÇÃO DE LISTAS
+# ============================================================
 
 @router.message(F.text == "➕ Nova Lista")
-async def new_list(message: types.Message, state: FSMContext):
+async def nova_lista(message: types.Message, state: FSMContext):
     dep_id, _ = await get_dep_from_state(state)
+
     if not dep_id:
-        return await message.answer("Envie /start e escolha o departamento primeiro.")
+        return await message.answer(
+            "Envie /start e escolha o departamento primeiro."
+        )
+
     await state.set_state(ListaState.criando_tipo)
-    await message.answer("Qual o tipo da lista?\nEscolha 'Avulsa' (lista comum) ou 'Fixa' (lista reutilizável).", reply_markup=kb_tipo_lista())
+
+    await message.answer(
+        "Qual é o tipo da lista?\n\n"
+        "• Avulsa: usada para uma compra e removida ao terminar.\n"
+        "• Fixa: reutilizável em várias compras.",
+        reply_markup=kb_tipo_lista(),
+    )
 
 
 @router.message(ListaState.criando_tipo)
-async def choose_list_type(message: types.Message, state: FSMContext):
+async def escolher_tipo_lista(message: types.Message, state: FSMContext):
+    texto = (message.text or "").strip().lower()
+
     if message.text == "⬅️ Voltar":
         await state.set_state(ListaState.escolhendo_lista)
-        await state.update_data(menu_origin="cadastro")
-        return await message.answer("Gerenciar Listas:", reply_markup=kb_listas_menu(allow_iniciar=False))
+        await state.update_data(
+            menu_origin="cadastro",
+            acao=None,
+        )
 
-    text = message.text.strip().lower()
-    if text not in ("avulsa", "fixa"):
-        return await message.answer("Por favor escolha 'Avulsa' ou 'Fixa' (ou clique '⬅️ Voltar').", reply_markup=kb_tipo_lista())
+        return await message.answer(
+            "📋 Gerenciar Listas:",
+            reply_markup=kb_listas_menu(allow_iniciar=False),
+        )
 
-    lista_tipo = "avulsa" if text == "avulsa" else "fixa"
-    await state.update_data(lista_tipo=lista_tipo)
+    if texto not in ("avulsa", "fixa"):
+        return await message.answer(
+            "Escolha uma das opções: Avulsa ou Fixa.",
+            reply_markup=kb_tipo_lista(),
+        )
+
+    await state.update_data(lista_tipo=texto)
     await state.set_state(ListaState.criando_nome)
-    await message.answer("Digite o nome da lista:", reply_markup=ReplyKeyboardRemove())
+
+    await message.answer(
+        "Digite o nome da lista:",
+        reply_markup=ReplyKeyboardRemove(),
+    )
 
 
 @router.message(ListaState.criando_nome)
-async def save_list(message: types.Message, state: FSMContext):
+async def salvar_lista(message: types.Message, state: FSMContext):
     dep_id, _ = await get_dep_from_state(state)
+
     if not dep_id:
-        await state.clear()
-        return await message.answer("Envie /start e escolha o departamento primeiro.")
+        await limpar_estado_preservando_departamento(state)
 
-    lista_nome = message.text.strip()
+        return await message.answer(
+            "Envie /start e escolha o departamento primeiro."
+        )
+
+    nome_lista = (message.text or "").strip()
+
+    if not nome_lista:
+        return await message.answer(
+            "O nome da lista não pode ficar vazio. Digite um nome:"
+        )
+
     data = await state.get_data()
-    lista_tipo = data.get("lista_tipo", "avulsa")
+    tipo_lista = data.get("lista_tipo", "avulsa")
 
-    sucesso = await database.criar_lista(dep_id, lista_nome, lista_tipo)
+    sucesso = await database.criar_lista(
+        dep_id,
+        nome_lista,
+        tipo_lista,
+    )
 
     await limpar_estado_preservando_departamento(state)
     await state.set_state(ListaState.escolhendo_lista)
-    await state.update_data(menu_origin="cadastro")
+    await state.update_data(
+        menu_origin="cadastro",
+        acao=None,
+    )
 
     if sucesso:
-        await message.answer(f"✅ Lista *{lista_nome}* criada ({lista_tipo}).", parse_mode="Markdown", reply_markup=kb_listas_menu())
-    else:
-        await message.answer("❌ Não foi possível criar a lista (nome já existe?).", reply_markup=kb_listas_menu())
+        return await message.answer(
+            f"✅ Lista *{nome_lista}* criada como *{tipo_lista}*.",
+            parse_mode="Markdown",
+            reply_markup=kb_listas_menu(),
+        )
 
+    await message.answer(
+        "❌ Não foi possível criar a lista. "
+        "Talvez já exista uma lista com esse nome.",
+        reply_markup=kb_listas_menu(),
+    )
+
+
+# ============================================================
+# ADICIONAR ITENS
+# ============================================================
 
 @router.message(F.text == "📝 Adicionar Itens")
-async def add_item_start(message: types.Message, state: FSMContext):
+async def adicionar_item_start(message: types.Message, state: FSMContext):
     dep_id, _ = await get_dep_from_state(state)
-    if not dep_id:
-        return await message.answer("Envie /start e escolha o departamento primeiro.")
-    listas = await database.pegar_listas_disponiveis(dep_id)
-    if not listas:
-        return await message.answer("Crie uma lista primeiro!", reply_markup=kb_listas_menu())
-    await state.set_state(ListaState.escolhendo_lista)
-    await state.update_data(acao="adicionar", menu_origin="cadastro")
-    await message.answer("Selecione a lista:", reply_markup=kb_lista_escolha(listas))
 
+    if not dep_id:
+        return await message.answer(
+            "Envie /start e escolha um departamento primeiro."
+        )
+
+    listas = await database.pegar_listas_disponiveis(dep_id)
+
+    if not listas:
+        return await message.answer(
+            "Crie uma lista primeiro!",
+            reply_markup=kb_listas_menu(),
+        )
+
+    await state.set_state(ListaState.escolhendo_lista)
+    await state.update_data(
+        acao="adicionar",
+        menu_origin="cadastro",
+    )
+
+    await message.answer(
+        "Selecione a lista que receberá os novos itens:",
+        reply_markup=kb_lista_escolha(listas),
+    )
+
+
+# ============================================================
+# SELEÇÃO DE LISTA: ADICIONAR OU INICIAR COMPRA
+# ============================================================
 
 @router.message(ListaState.escolhendo_lista)
-async def list_chosen(message: types.Message, state: FSMContext):
-    # DEBUG entry
-    await _log_handler_entry("list_chosen", message, state)
+async def escolher_lista(message: types.Message, state: FSMContext):
+    await log_handler("escolher_lista", message, state)
 
-    # Se o usuário clicou no botão "Remover Item" enquanto está no estado escolhendo_lista,
-    # delegamos para o handler que inicia o fluxo de remoção.
-    if message.text == "🗑️ Remover Item":
+    texto = message.text or ""
+
+    if texto == "🗑️ Remover Item":
         return await remover_item_start(message, state)
 
-    # Handler dedicado para seleção de listas nos fluxos de cadastro/compras (não-remocao)
-    if message.text == "⬅️ Voltar":
+    if texto == "⬅️ Voltar":
         return await voltar_para_origem(message, state)
 
     data = await state.get_data()
     dep_id, _ = await get_dep_from_state(state)
+
     if not dep_id:
-        await state.clear()
-        return await message.answer("Envie /start e escolha o departamento primeiro.")
+        await limpar_estado_preservando_departamento(state)
 
-    lista_nome = message.text.strip()
-    lista_row = await database.buscar_lista_por_nome(dep_id, lista_nome)
+        return await message.answer(
+            "Envie /start e escolha um departamento primeiro."
+        )
 
-    if not lista_row:
+    nome_lista = texto.strip()
+
+    lista = await database.buscar_lista_por_nome(
+        dep_id,
+        nome_lista,
+    )
+
+    if not lista:
         listas_disponiveis = await database.pegar_listas_disponiveis(dep_id)
-        text_norm = lista_nome.lower()
-        for l in listas_disponiveis:
-            if l.get("nome", "").strip().lower() == text_norm:
-                lista_row = l
+        nome_normalizado = nome_lista.lower()
+
+        for lista_disponivel in listas_disponiveis:
+            if lista_disponivel.get("nome", "").strip().lower() == nome_normalizado:
+                lista = lista_disponivel
                 break
 
-    if not lista_row:
+    if not lista:
         listas = await database.pegar_listas_disponiveis(dep_id)
+
         if not listas:
-            return await message.answer("Lista não encontrada e não há listas disponíveis.", reply_markup=kb_listas_menu(allow_iniciar=False))
-        await state.set_state(ListaState.escolhendo_lista)
-        menu_origin = data.get("menu_origin", "cadastro")
-        await state.update_data(menu_origin=menu_origin)
-        return await message.answer("Lista não encontrada. Selecione uma das listas abaixo:", reply_markup=kb_lista_escolha(listas))
-
-    acao = data.get("acao")
-
-    # ADICIONAR ITENS (cadastro)
-    if acao == "adicionar":
-        itens = await database.pegar_itens_da_lista(lista_row["id"])
-        extrato = montar_extrato_texto(itens)
-        await message.answer(f"Extrato atual da lista *{lista_row.get('nome')}*:\n\n{extrato}", parse_mode="Markdown")
-        await state.set_state(ListaState.navegando_catalogo)
-        await state.update_data(caminho=[], lista_nome=lista_row.get("nome"), lista_itens=itens, acao="adicionar")
-        opts = catalogo.obter_opcoes([])
-        return await message.answer("Escolha a categoria:", reply_markup=kb_opcoes(opts, True))
-
-    # INICIAR COMPRA A PARTIR DA LISTA
-    itens = await database.pegar_itens_da_lista(lista_row["id"])
-    if not itens:
-        await database.deletar_lista(lista_row["id"])
-
-        # reconsulta listas disponíveis e redireciona para o menu de listas (cadastro)
-        listas = await database.pegar_listas_disponiveis(dep_id)
-        if not listas:
-            # não há mais listas: limpa estado e mostra menu de listas em modo cadastro
-            await state.clear()
             return await message.answer(
-                "A lista estava vazia e foi excluída automaticamente. Não há mais listas.",
+                "Lista não encontrada e não há listas disponíveis.",
                 reply_markup=kb_listas_menu(allow_iniciar=False),
             )
 
-        # há outras listas: coloca usuário em escolhendo_lista para gerenciar
         await state.set_state(ListaState.escolhendo_lista)
-        await state.update_data(menu_origin="cadastro")
+
         return await message.answer(
-            "A lista estava vazia e foi excluída automaticamente. Selecione outra lista:",
+            "Lista não encontrada. Escolha uma das listas abaixo:",
             reply_markup=kb_lista_escolha(listas),
         )
 
-    lista_id = lista_row["id"]
-    lista_tipo = lista_row.get("tipo", "avulsa")
+    acao = data.get("acao")
 
-    await state.set_state(ListaState.compra_navegando)
-    # itens_pendentes armazena a cópia dos itens para esta sessão (assim, lista fixa não é alterada no DB)
-    await state.update_data(itens_pendentes=itens, caminho=[], lista_id=lista_id, lista_tipo=lista_tipo, lista_nome=lista_row.get("nome"))
-    categorias_filtradas = categorias_para_itens(itens)
-    return await message.answer(f"Iniciando compra: {lista_row.get('nome')}", reply_markup=kb_opcoes(categorias_filtradas, True))
+    # --------------------------------------------------------
+    # ADICIONAR ITENS
+    # --------------------------------------------------------
+    if acao == "adicionar":
+        itens = await database.pegar_itens_da_lista(lista["id"])
+        extrato = montar_extrato_texto(itens)
 
+        await state.set_state(ListaState.navegando_catalogo)
+        await state.update_data(
+            caminho=[],
+            lista_id=lista["id"],
+            lista_nome=lista.get("nome"),
+            lista_itens=itens,
+            acao="adicionar",
+            menu_origin="cadastro",
+        )
 
-# Handler DEDICADO para seleção de lista no fluxo de REMOÇÃO
-@router.message(ListaState.escolhendo_lista_remover)
-async def list_chosen_remover(message: types.Message, state: FSMContext):
-    # DEBUG entry
-    await _log_handler_entry("list_chosen_remover", message, state)
+        await message.answer(
+            f"Extrato atual da lista *{lista.get('nome')}*:\n\n{extrato}",
+            parse_mode="Markdown",
+        )
 
-    if message.text == "⬅️ Voltar":
-        # voltar para menu de cadastros
-        await state.set_state(ListaState.escolhendo_lista)
-        await state.update_data(menu_origin="cadastro")
-        return await message.answer("Gerenciar Listas:", reply_markup=kb_listas_menu(allow_iniciar=False))
+        return await message.answer(
+            "Escolha uma categoria:",
+            reply_markup=kb_opcoes(catalogo.obter_opcoes([])),
+        )
 
-    dep_id, _ = await get_dep_from_state(state)
-    if not dep_id:
-        await state.clear()
-        return await message.answer("Envie /start e escolha o departamento primeiro.")
+    # --------------------------------------------------------
+    # INICIAR COMPRA
+    # --------------------------------------------------------
+    itens = await database.pegar_itens_da_lista(lista["id"])
 
-    lista_nome = message.text.strip()
-    lista_row = await database.buscar_lista_por_nome(dep_id, lista_nome)
-
-    if not lista_row:
-        listas = await database.pegar_listas_disponiveis(dep_id)
-        return await message.answer("Lista não encontrada. Selecione uma das listas abaixo:", reply_markup=kb_lista_escolha(listas))
-
-    itens = await database.pegar_itens_da_lista(lista_row["id"])
     if not itens:
-        await database.deletar_lista(lista_row["id"])
-        listas = await database.pegar_listas_disponiveis(dep_id)
-        if not listas:
-            await state.clear()
+        await database.deletar_lista(lista["id"])
+
+        listas_restantes = await database.pegar_listas_disponiveis(dep_id)
+
+        if not listas_restantes:
+            await limpar_estado_preservando_departamento(state)
+
             return await message.answer(
-                "A lista estava vazia e foi excluída automaticamente. Não há mais listas.",
+                "A lista estava vazia e foi excluída automaticamente. "
+                "Não há mais listas disponíveis.",
                 reply_markup=kb_listas_menu(allow_iniciar=False),
             )
-        return await message.answer("A lista estava vazia e foi excluída automaticamente. Selecione outra lista:", reply_markup=kb_lista_escolha(listas))
 
-    # iniciar navegação de remoção
+        await state.set_state(ListaState.escolhendo_lista)
+        await state.update_data(
+            menu_origin="cadastro",
+            acao="iniciar_compra",
+        )
+
+        return await message.answer(
+            "A lista estava vazia e foi excluída automaticamente. "
+            "Selecione outra lista:",
+            reply_markup=kb_lista_escolha(listas_restantes),
+        )
+
+    lista_id = lista["id"]
+    lista_tipo = lista.get("tipo", "avulsa")
+
+    await state.set_state(ListaState.compra_navegando)
+    await state.update_data(
+        itens_pendentes=itens.copy(),
+        caminho=[],
+        lista_id=lista_id,
+        lista_tipo=lista_tipo,
+        lista_nome=lista.get("nome"),
+        menu_origin=data.get("menu_origin", "compras"),
+        acao="iniciar_compra",
+    )
+
+    categorias = categorias_para_itens(itens)
+
+    await message.answer(
+        f"🛒 Iniciando compra da lista: *{lista.get('nome')}*",
+        parse_mode="Markdown",
+        reply_markup=kb_opcoes(categorias),
+    )
+
+
+# ============================================================
+# NAVEGAÇÃO PARA ADICIONAR ITENS
+# ============================================================
+
+@router.message(ListaState.navegando_catalogo)
+async def navegar_adicionar_item(message: types.Message, state: FSMContext):
+    await log_handler("navegar_adicionar_item", message, state)
+
+    data = await state.get_data()
+    caminho = data.get("caminho", [])
+    texto = message.text or ""
+
+    if texto == "⬅️ Voltar":
+        if not caminho:
+            return await voltar_para_origem(message, state)
+
+        caminho.pop()
+
+        await state.update_data(caminho=caminho)
+
+        return await message.answer(
+            "Selecione:",
+            reply_markup=kb_opcoes(catalogo.obter_opcoes(caminho)),
+        )
+
+    tipo, chave = catalogo.identificar_escolha(
+        caminho,
+        texto.strip(),
+    )
+
+    if tipo == "categoria":
+        caminho.append(chave)
+
+        await state.update_data(caminho=caminho)
+
+        return await message.answer(
+            "Selecione:",
+            reply_markup=kb_opcoes(catalogo.obter_opcoes(caminho)),
+        )
+
+    if tipo == "produto":
+        dep_id, _ = await get_dep_from_state(state)
+        nome_lista = data.get("lista_nome")
+
+        if not nome_lista:
+            return await message.answer(
+                "Lista não encontrada no estado. Reabra o fluxo."
+            )
+
+        lista = await database.buscar_lista_por_nome(
+            dep_id,
+            nome_lista,
+        )
+
+        if not lista:
+            return await message.answer(
+                "Lista não encontrada no banco de dados."
+            )
+
+        await database.adicionar_item_lista(
+            lista["id"],
+            chave,
+        )
+
+        itens_atualizados = await database.pegar_itens_da_lista(lista["id"])
+        extrato = montar_extrato_texto(itens_atualizados)
+
+        await state.update_data(
+            lista_itens=itens_atualizados,
+            caminho=caminho,
+            lista_nome=nome_lista,
+        )
+
+        await message.answer(
+            f"✅ {catalogo.formatar(chave)} foi adicionado à lista "
+            f"*{nome_lista}*!\n\n"
+            f"Extrato atualizado:\n\n{extrato}",
+            parse_mode="Markdown",
+        )
+
+        return await message.answer(
+            "Deseja adicionar mais itens? Selecione:",
+            reply_markup=kb_opcoes(catalogo.obter_opcoes(caminho)),
+        )
+
+    await message.answer("Escolha inválida. Use os botões exibidos.")
+
+
+# ============================================================
+# REMOVER ITENS
+# ============================================================
+
+@router.message(ListaState.escolhendo_lista_remover)
+async def escolher_lista_remover(message: types.Message, state: FSMContext):
+    await log_handler("escolher_lista_remover", message, state)
+
+    texto = message.text or ""
+
+    if texto == "⬅️ Voltar":
+        await state.set_state(ListaState.escolhendo_lista)
+        await state.update_data(
+            menu_origin="cadastro",
+            acao=None,
+        )
+
+        return await message.answer(
+            "📋 Gerenciar Listas:",
+            reply_markup=kb_listas_menu(allow_iniciar=False),
+        )
+
+    dep_id, _ = await get_dep_from_state(state)
+
+    if not dep_id:
+        await limpar_estado_preservando_departamento(state)
+
+        return await message.answer(
+            "Envie /start e escolha um departamento primeiro."
+        )
+
+    lista = await database.buscar_lista_por_nome(
+        dep_id,
+        texto.strip(),
+    )
+
+    if not lista:
+        listas = await database.pegar_listas_disponiveis(dep_id)
+
+        return await message.answer(
+            "Lista não encontrada. Escolha uma lista abaixo:",
+            reply_markup=kb_lista_escolha(listas),
+        )
+
+    itens = await database.pegar_itens_da_lista(lista["id"])
+
+    if not itens:
+        await database.deletar_lista(lista["id"])
+
+        listas = await database.pegar_listas_disponiveis(dep_id)
+
+        if not listas:
+            await limpar_estado_preservando_departamento(state)
+
+            return await message.answer(
+                "A lista estava vazia e foi excluída automaticamente. "
+                "Não há mais listas.",
+                reply_markup=kb_listas_menu(allow_iniciar=False),
+            )
+
+        return await message.answer(
+            "A lista estava vazia e foi excluída automaticamente. "
+            "Selecione outra lista:",
+            reply_markup=kb_lista_escolha(listas),
+        )
+
     await state.set_state(ListaState.removendo_navegando)
     await state.update_data(
-        lista_id=lista_row["id"],
-        lista_nome=lista_row["nome"],
+        lista_id=lista["id"],
+        lista_nome=lista["nome"],
         lista_itens=itens,
         caminho=[],
         acao="remover_item",
         menu_origin="cadastro",
     )
-    top_cats = categorias_para_itens(itens)
-    return await message.answer(f"Remover item da lista *{lista_row['nome']}*\nEscolha a categoria:", parse_mode="Markdown", reply_markup=kb_opcoes(top_cats, True))
+
+    categorias = categorias_para_itens(itens)
+
+    await message.answer(
+        f"Remover item da lista *{lista['nome']}*.\n\n"
+        "Escolha a categoria:",
+        parse_mode="Markdown",
+        reply_markup=kb_opcoes(categorias),
+    )
 
 
-# NAVEGAÇÃO PARA ADICIONAR (mantive igual)
-@router.message(ListaState.navegando_catalogo)
-async def nav_add(message: types.Message, state: FSMContext):
-    # DEBUG entry
-    await _log_handler_entry("nav_add", message, state)
-
-    data = await state.get_data()
-    caminho = data.get("caminho", [])
-    lista_itens = data.get("lista_itens", [])
-
-    if message.text == "⬅️ Voltar":
-        if not caminho:
-            return await voltar_para_origem(message, state)
-        caminho.pop()
-        await state.update_data(caminho=caminho)
-        acao = data.get("acao")
-        menu_origin = data.get("menu_origin", "")
-        if acao == "adicionar" or menu_origin == "cadastro":
-            opts = catalogo.obter_opcoes(caminho)
-        else:
-            opts = opcoes_filtradas_para_itens(caminho, lista_itens)
-        return await message.answer("Selecione:", reply_markup=kb_opcoes(opts, True))
-
-    escolha = message.text.strip()
-    tipo, chave = catalogo.identificar_escolha(caminho, escolha)
-
-    if tipo == "categoria":
-        caminho.append(chave)
-        await state.update_data(caminho=caminho)
-        acao = data.get("acao")
-        menu_origin = data.get("menu_origin", "")
-        if acao == "adicionar" or menu_origin == "cadastro":
-            opts = catalogo.obter_opcoes(caminho)
-        else:
-            opts = opcoes_filtradas_para_itens(caminho, lista_itens)
-        await message.answer("Selecione:", reply_markup=kb_opcoes(opts, True))
-        return
-
-    if tipo == "produto":
-        dep_id, _ = await get_dep_from_state(state)
-        lista_nome = data.get("lista_nome")
-        if not lista_nome:
-            return await message.answer("Lista não encontrada no estado. Reabra o fluxo.")
-        lista_row = await database.buscar_lista_por_nome(dep_id, lista_nome)
-        if not lista_row:
-            return await message.answer("Lista não encontrada no banco.")
-        await database.adicionar_item_lista(lista_row["id"], chave)
-
-        itens_atualizados = await database.pegar_itens_da_lista(lista_row["id"])
-        extrato = montar_extrato_texto(itens_atualizados)
-        await message.answer(f"✅ {catalogo.formatar(chave)} adicionado à lista *{lista_nome}*!\n\nExtrato atualizado:\n\n{extrato}", parse_mode="Markdown")
-
-        caminho_atual = data.get("caminho", [])
-        await state.update_data(lista_itens=itens_atualizados, caminho=caminho_atual, lista_nome=lista_nome)
-        acao = data.get("acao")
-        menu_origin = data.get("menu_origin", "")
-        if acao == "adicionar" or menu_origin == "cadastro":
-            opts = catalogo.obter_opcoes(caminho_atual)
-        else:
-            opts = opcoes_filtradas_para_itens(caminho_atual, itens_atualizados)
-        await state.set_state(ListaState.navegando_catalogo)
-        return await message.answer("Deseja adicionar mais itens? Selecione:", reply_markup=kb_opcoes(opts, True))
-
-    await message.answer("Escolha inválida.")
-
-
-# NAVEGAÇÃO PARA REMOVER: Categoria -> Subcategoria -> Item -> remover
 @router.message(ListaState.removendo_navegando)
-async def nav_remove(message: types.Message, state: FSMContext):
-    # DEBUG entry
-    await _log_handler_entry("nav_remove", message, state)
+async def navegar_remover_item(message: types.Message, state: FSMContext):
+    await log_handler("navegar_remover_item", message, state)
 
     data = await state.get_data()
     caminho = data.get("caminho", [])
-    lista_itens = data.get("lista_itens", [])
+    itens_lista = data.get("lista_itens", [])
+    texto = message.text or ""
 
-    # voltar: se no topo, volta à seleção de listas para remover; se dentro, sobe nível
-    if message.text == "⬅️ Voltar":
+    if texto == "⬅️ Voltar":
         if not caminho:
-            await state.set_state(ListaState.escolhendo_lista_remover)
             dep_id, _ = await get_dep_from_state(state)
             listas = await database.pegar_listas_disponiveis(dep_id)
-            return await message.answer("Selecione a lista para remover itens:", reply_markup=kb_lista_escolha(listas))
-        caminho.pop()
-        await state.update_data(caminho=caminho)
-        opts = opcoes_filtradas_para_itens(caminho, lista_itens)
-        return await message.answer("Selecione:", reply_markup=kb_opcoes(opts, True))
 
-    escolha = message.text.strip()
-    tipo, chave = catalogo.identificar_escolha(caminho, escolha)
+            await state.set_state(ListaState.escolhendo_lista_remover)
+
+            return await message.answer(
+                "Selecione a lista para remover itens:",
+                reply_markup=kb_lista_escolha(listas),
+            )
+
+        caminho.pop()
+
+        await state.update_data(caminho=caminho)
+
+        opcoes = opcoes_filtradas_para_itens(
+            caminho,
+            itens_lista,
+        )
+
+        return await message.answer(
+            "Selecione:",
+            reply_markup=kb_opcoes(opcoes),
+        )
+
+    tipo, chave = catalogo.identificar_escolha(
+        caminho,
+        texto.strip(),
+    )
 
     if tipo == "categoria":
         caminho.append(chave)
+
         await state.update_data(caminho=caminho)
-        opts = opcoes_filtradas_para_itens(caminho, lista_itens)
-        await message.answer("Selecione:", reply_markup=kb_opcoes(opts, True))
-        return
+
+        opcoes = opcoes_filtradas_para_itens(
+            caminho,
+            itens_lista,
+        )
+
+        return await message.answer(
+            "Selecione:",
+            reply_markup=kb_opcoes(opcoes),
+        )
 
     if tipo == "produto":
         produto = chave
         lista_id = data.get("lista_id")
-        lista_nome = data.get("lista_nome")
+        nome_lista = data.get("lista_nome")
+
         if not lista_id:
-            return await message.answer("Erro: lista não encontrada no estado.")
+            return await message.answer(
+                "Erro: lista não encontrada no estado."
+            )
 
-        # realiza remoção no DB
-        await database.remover_item_lista(lista_id, produto)
+        await database.remover_item_lista(
+            lista_id,
+            produto,
+        )
 
-        # reconsulta itens restantes
         itens_restantes = await database.pegar_itens_da_lista(lista_id)
 
         if not itens_restantes:
-            deleted = await database.deletar_lista(lista_id)
+            excluida = await database.deletar_lista(lista_id)
 
-            # reconsulta listas disponíveis
             dep_id, _ = await get_dep_from_state(state)
-            listas = await database.pegar_listas_disponiveis(dep_id) if dep_id else []
+            listas = await database.pegar_listas_disponiveis(dep_id)
 
-            if deleted:
-                if not listas:
-                    # nenhuma lista restante: limpa estado e mostra menu de listas (cadastro)
-                    await state.clear()
-                    return await message.answer(
-                        f"✅ {catalogo.formatar(produto)} removido. A lista *{lista_nome}* ficou vazia e foi excluída.",
-                        parse_mode="Markdown",
-                        reply_markup=kb_listas_menu(allow_iniciar=False),
-                    )
+            if excluida and not listas:
+                await limpar_estado_preservando_departamento(state)
 
-                # há outras listas: volta para escolhendo_lista no fluxo de cadastro
-                await state.set_state(ListaState.escolhendo_lista)
-                await state.update_data(menu_origin="cadastro")
                 return await message.answer(
-                    f"✅ {catalogo.formatar(produto)} removido. A lista *{lista_nome}* ficou vazia e foi excluída. Selecione outra lista:",
-                    parse_mode="Markdown",
-                    reply_markup=kb_lista_escolha(listas),
-                )
-            else:
-                # falha ao deletar: limpa estado e mostre menu de listas para evitar loops
-                await state.clear()
-                return await message.answer(
-                    f"✅ {catalogo.formatar(produto)} removido. A lista ficou vazia, mas não foi possível removê-la automaticamente.",
+                    f"✅ {catalogo.formatar(produto)} removido.\n\n"
+                    f"A lista *{nome_lista}* ficou vazia e foi excluída.",
                     parse_mode="Markdown",
                     reply_markup=kb_listas_menu(allow_iniciar=False),
                 )
 
-        # atualiza estado e permanece no fluxo de remoção para remover mais itens
-        await state.update_data(lista_itens=itens_restantes)
-        opts = opcoes_filtradas_para_itens(caminho, itens_restantes)
-        await state.set_state(ListaState.removendo_navegando)
-        await message.answer(f"✅ {catalogo.formatar(produto)} removido da lista *{lista_nome}*.", parse_mode="Markdown")
-        return await message.answer("Selecione o próximo item para remover ou volte:", reply_markup=kb_opcoes(opts, True))
+            if excluida:
+                await state.set_state(ListaState.escolhendo_lista_remover)
+                await state.update_data(
+                    menu_origin="cadastro",
+                    acao="remover",
+                )
 
-    await message.answer("Escolha inválida.")
+                return await message.answer(
+                    f"✅ {catalogo.formatar(produto)} removido.\n\n"
+                    f"A lista *{nome_lista}* ficou vazia e foi excluída. "
+                    "Selecione outra lista:",
+                    parse_mode="Markdown",
+                    reply_markup=kb_lista_escolha(listas),
+                )
 
+            await limpar_estado_preservando_departamento(state)
+
+            return await message.answer(
+                f"✅ {catalogo.formatar(produto)} removido.\n\n"
+                "A lista ficou vazia, mas não foi possível removê-la automaticamente.",
+                parse_mode="Markdown",
+                reply_markup=kb_listas_menu(allow_iniciar=False),
+            )
+
+        await state.update_data(
+            lista_itens=itens_restantes,
+        )
+
+        opcoes = opcoes_filtradas_para_itens(
+            caminho,
+            itens_restantes,
+        )
+
+        await message.answer(
+            f"✅ {catalogo.formatar(produto)} removido da lista "
+            f"*{nome_lista}*.",
+            parse_mode="Markdown",
+        )
+
+        return await message.answer(
+            "Selecione o próximo item para remover ou volte:",
+            reply_markup=kb_opcoes(opcoes),
+        )
+
+    await message.answer("Escolha inválida. Use os botões exibidos.")
+
+
+# ============================================================
+# COMPRA A PARTIR DE LISTA
+# ============================================================
 
 @router.message(ListaState.compra_navegando)
-async def compra_navegar(message: types.Message, state: FSMContext):
-    # DEBUG entry
-    await _log_handler_entry("compra_navegar", message, state)
-
-    if message.text == "⬅️ Voltar":
-        return await voltar_para_origem(message, state)
+async def navegar_compra(message: types.Message, state: FSMContext):
+    await log_handler("navegar_compra", message, state)
 
     data = await state.get_data()
+    texto = message.text or ""
     caminho = data.get("caminho", [])
     itens_pendentes = data.get("itens_pendentes", [])
 
-    if message.text == "❌ Cancelar":
+    if texto in ("⬅️ Voltar", "❌ Cancelar"):
+        if caminho and texto == "⬅️ Voltar":
+            caminho.pop()
+
+            await state.update_data(caminho=caminho)
+
+            opcoes = opcoes_filtradas_para_itens(
+                caminho,
+                itens_pendentes,
+            )
+
+            return await message.answer(
+                "Selecione:",
+                reply_markup=kb_opcoes(opcoes),
+            )
+
         return await voltar_para_origem(message, state)
 
-    escolha = message.text.strip()
-    tipo, chave = catalogo.identificar_escolha(caminho, escolha)
+    tipo, chave = catalogo.identificar_escolha(
+        caminho,
+        texto.strip(),
+    )
+
     if tipo == "categoria":
         caminho.append(chave)
+
         await state.update_data(caminho=caminho)
-        opts = opcoes_filtradas_para_itens(caminho, itens_pendentes)
-        await message.answer("Selecione:", reply_markup=kb_opcoes(opts, True))
-        return
+
+        opcoes = opcoes_filtradas_para_itens(
+            caminho,
+            itens_pendentes,
+        )
+
+        return await message.answer(
+            "Selecione:",
+            reply_markup=kb_opcoes(opcoes),
+        )
 
     if tipo == "produto":
-        produto = chave
-        await state.update_data(produto=produto)
+        await state.update_data(produto=chave)
         await state.set_state(ListaState.compra_quantidade)
-        await message.answer(f"Quanto de {catalogo.formatar(produto)}?", reply_markup=ReplyKeyboardRemove())
-        return
 
-    await message.answer("Escolha inválida.")
+        return await message.answer(
+            f"Quanto de *{catalogo.formatar(chave)}*?",
+            parse_mode="Markdown",
+            reply_markup=ReplyKeyboardRemove(),
+        )
+
+    await message.answer("Escolha inválida. Use os botões exibidos.")
 
 
 @router.message(ListaState.compra_quantidade)
-async def compra_set_qtd(message: types.Message, state: FSMContext):
+async def definir_quantidade_compra(message: types.Message, state: FSMContext):
+    texto = (message.text or "").strip()
+
     try:
-        qtd = float(message.text.replace(",", "."))
-        await state.update_data(qtd=qtd)
-        await state.set_state(ListaState.compra_valor)
-        await message.answer("Qual o valor unitário? (Ex: 5.50)")
-    except Exception:
-        await message.answer("Por favor, digite um número válido.")
+        quantidade = float(texto.replace(",", "."))
+
+        if quantidade <= 0:
+            raise ValueError
+
+    except (TypeError, ValueError):
+        return await message.answer(
+            "Digite uma quantidade válida maior que zero.\n"
+            "Exemplo: 1, 2.5 ou 0,500"
+        )
+
+    await state.update_data(quantidade=quantidade)
+    await state.set_state(ListaState.compra_valor)
+
+    await message.answer(
+        "Qual é o valor unitário?\n\n"
+        "Exemplo: 5,50"
+    )
 
 
 @router.message(ListaState.compra_valor)
-async def compra_set_valor(message: types.Message, state: FSMContext):
+async def definir_valor_compra(message: types.Message, state: FSMContext):
+    texto = (message.text or "").strip()
+
     try:
-        valor = float(message.text.replace(",", "."))
-    except Exception:
-        await message.answer("Valor inválido.")
-        return
+        valor = float(texto.replace(",", "."))
+
+        if valor < 0:
+            raise ValueError
+
+    except (TypeError, ValueError):
+        return await message.answer(
+            "Digite um valor válido.\n"
+            "Exemplo: 5,50"
+        )
 
     data = await state.get_data()
+
     produto = data.get("produto")
-    qtd = data.get("qtd")
-    dep_id, _ = await get_dep_from_state(state)
-    if not dep_id:
-        await state.clear()
-        return await message.answer("Envie /start e escolha um departamento primeiro.")
+    quantidade = data.get("quantidade")
     lista_id = data.get("lista_id")
     lista_tipo = data.get("lista_tipo", "avulsa")
-
-    # salva no carrinho (sempre)
-    await database.adicionar_ao_carrinho(message.from_user.id, dep_id, produto, qtd, valor)
-
-    # comportamento diferente para listas fixas: NÃO remover do DB
-    if lista_id and lista_tipo != "fixa":
-        await database.remover_item_lista(lista_id, produto)
-
-    # remove apenas da sessão (itens_pendentes) para refletir "sair temporariamente"
     itens_pendentes = data.get("itens_pendentes", [])
+
+    dep_id, _ = await get_dep_from_state(state)
+
+    if not dep_id:
+        await limpar_estado_preservando_departamento(state)
+
+        return await message.answer(
+            "Envie /start e escolha um departamento primeiro."
+        )
+
+    await database.adicionar_ao_carrinho(
+        message.from_user.id,
+        dep_id,
+        produto,
+        quantidade,
+        valor,
+    )
+
+    # Lista avulsa: compra remove item permanentemente da lista.
+    # Lista fixa: item permanece salvo no banco para a próxima compra.
+    if lista_id and lista_tipo != "fixa":
+        await database.remover_item_lista(
+            lista_id,
+            produto,
+        )
+
+    # Remove o item da sessão atual de compra, inclusive em listas fixas.
     if produto in itens_pendentes:
         try:
             itens_pendentes.remove(produto)
         except ValueError:
             pass
 
-    # Monta mensagem principal (sucesso) e também inclui o extrato do CARRINHO (melhora UX)
+    await state.update_data(
+        itens_pendentes=itens_pendentes,
+    )
+
     try:
-        # tenta montar extrato do carrinho atual para exibir ao usuário
-        carrinho = await database.pegar_carrinho(message.from_user.id, dep_id)
+        carrinho = await database.pegar_carrinho(
+            message.from_user.id,
+            dep_id,
+        )
+
         extrato_carrinho = montar_extrato_carrinho_local(carrinho)
+
     except Exception:
         extrato_carrinho = None
 
-    # Mensagem de confirmação específica (mantive lógica existente para listas)
-    try:
-        if lista_id:
-            if lista_tipo == "fixa":
-                extrato_texto = montar_extrato_texto(itens_pendentes)
-                msg_principal = f"✅ {catalogo.formatar(produto)} adicionado ao carrinho!\n\nExtrato (itens restantes nesta compra):\n\n{extrato_texto}"
-            else:
-                itens_restantes_db = await database.pegar_itens_da_lista(lista_id)
-                extrato_texto = montar_extrato_texto(itens_restantes_db)
-                msg_principal = f"✅ {catalogo.formatar(produto)} adicionado ao carrinho!\n\nExtrato atualizado da lista:\n\n{extrato_texto}"
-        else:
-            # sem lista: mostra extrato do carrinho
-            if extrato_carrinho:
-                msg_principal = f"✅ {catalogo.formatar(produto)} adicionado ao carrinho!\n\nExtrato do carrinho:\n\n{extrato_carrinho}"
-            else:
-                msg_principal = f"✅ {catalogo.formatar(produto)} adicionado ao carrinho!"
-    except Exception:
-        msg_principal = f"✅ {catalogo.formatar(produto)} adicionado ao carrinho!"
-        extrato_carrinho = None
+    if lista_id and lista_tipo == "fixa":
+        extrato_restante = montar_extrato_texto(itens_pendentes)
 
-    await state.update_data(itens_pendentes=itens_pendentes)
+        mensagem_principal = (
+            f"✅ *{catalogo.formatar(produto)}* foi adicionado ao carrinho!\n\n"
+            "A lista fixa foi preservada.\n\n"
+            "Itens restantes nesta compra:\n\n"
+            f"{extrato_restante}"
+        )
+
+    elif lista_id:
+        itens_banco = await database.pegar_itens_da_lista(lista_id)
+        extrato_lista = montar_extrato_texto(itens_banco)
+
+        mensagem_principal = (
+            f"✅ *{catalogo.formatar(produto)}* foi adicionado ao carrinho!\n\n"
+            "Extrato atualizado da lista:\n\n"
+            f"{extrato_lista}"
+        )
+
+    elif extrato_carrinho:
+        mensagem_principal = (
+            f"✅ *{catalogo.formatar(produto)}* foi adicionado ao carrinho!\n\n"
+            "Extrato do carrinho:\n\n"
+            f"{extrato_carrinho}"
+        )
+
+    else:
+        mensagem_principal = (
+            f"✅ *{catalogo.formatar(produto)}* foi adicionado ao carrinho!"
+        )
 
     if itens_pendentes:
         await state.set_state(ListaState.compra_navegando)
         await state.update_data(caminho=[])
-        opts = categorias_para_itens(itens_pendentes)
-        # envia confirmação e pergunta do próximo item
-        await message.answer(msg_principal, reply_markup=ReplyKeyboardRemove())
-        await message.answer("Próximo item:", reply_markup=kb_opcoes(opts, True))
-    else:
-        # todos os itens da sessão foram processados
-        if lista_id and lista_tipo == "fixa":
-            # mostra opções finais específicas para listas fixas
-            kb_final = ReplyKeyboardMarkup(
-                keyboard=[
-                    [KeyboardButton(text="Finalizar compra"), KeyboardButton(text="Finalizar lista")]
-                ],
-                resize_keyboard=True,
-            )
-            await state.set_state(ListaState.finalizando_opcao)
-            # mantém lista_id/lista_nome no estado
-            await message.answer(msg_principal)
-            await message.answer("Escolha o que deseja fazer com a lista fixa:", reply_markup=kb_final)
-            return
-        else:
-            # comportamento antigo para listas avulsas / sem lista
-            if lista_id:
-                itens_restantes_db = await database.pegar_itens_da_lista(lista_id)
-                if not itens_restantes_db:
-                    deleted = await database.deletar_lista(lista_id)
-                    if deleted:
-                        await message.answer(msg_principal)
-                        await message.answer("✅ Todos os itens comprados — a lista foi removida automaticamente.")
-                    else:
-                        await message.answer(msg_principal)
-                        await message.answer("✅ Compra finalizada. (Não foi possível remover automaticamente a lista.)")
-                else:
-                    await message.answer(msg_principal)
-                    await message.answer("✅ Compra finalizada.")
+
+        categorias = categorias_para_itens(itens_pendentes)
+
+        await message.answer(
+            mensagem_principal,
+            parse_mode="Markdown",
+        )
+
+        return await message.answer(
+            "Próximo item:",
+            reply_markup=kb_opcoes(categorias),
+        )
+
+    # --------------------------------------------------------
+    # TODOS OS ITENS DA SESSÃO FORAM PROCESSADOS
+    # --------------------------------------------------------
+
+    if lista_id and lista_tipo == "fixa":
+        await state.set_state(ListaState.finalizando_opcao)
+
+        await message.answer(
+            mensagem_principal,
+            parse_mode="Markdown",
+        )
+
+        return await message.answer(
+            "A lista é fixa. O que deseja fazer?",
+            reply_markup=kb_final_lista_fixa(),
+        )
+
+    if lista_id:
+        itens_restantes_banco = await database.pegar_itens_da_lista(lista_id)
+
+        if not itens_restantes_banco:
+            excluida = await database.deletar_lista(lista_id)
+
+            if excluida:
+                await message.answer(
+                    mensagem_principal,
+                    parse_mode="Markdown",
+                )
+
+                await message.answer(
+                    "✅ Todos os itens foram comprados. "
+                    "A lista avulsa foi removida automaticamente."
+                )
+
             else:
-                await message.answer(msg_principal)
-                await message.answer("✅ Compra finalizada.")
-            return await voltar_para_origem(message, state)
+                await message.answer(
+                    mensagem_principal,
+                    parse_mode="Markdown",
+                )
+
+                await message.answer(
+                    "✅ Compra finalizada. "
+                    "Não foi possível remover automaticamente a lista avulsa."
+                )
+
+        else:
+            await message.answer(
+                mensagem_principal,
+                parse_mode="Markdown",
+            )
+
+            await message.answer("✅ Compra finalizada.")
+
+    else:
+        await message.answer(
+            mensagem_principal,
+            parse_mode="Markdown",
+        )
+
+        await message.answer("✅ Compra finalizada.")
+
+    await voltar_para_origem(message, state)
 
 
-# handler para as duas opções finais quando lista é fixa
+# ============================================================
+# FINALIZAÇÃO DE LISTA FIXA
+# ============================================================
+
 @router.message(ListaState.finalizando_opcao)
-async def finalizar_opcao(message: types.Message, state: FSMContext):
-    text = message.text.strip()
+async def finalizar_opcao_lista_fixa(message: types.Message, state: FSMContext):
+    texto = (message.text or "").strip()
     data = await state.get_data()
+
     lista_id = data.get("lista_id")
     lista_nome = data.get("lista_nome")
 
-    if text == "Finalizar compra":
-        # finaliza a sessão/compra, mantém a lista fixa no DB
-        await message.answer("✅ Compra finalizada — a lista fixa foi preservada.", reply_markup=kb_menu())
+    if texto == "Finalizar compra":
         await limpar_estado_preservando_departamento(state)
-        return
 
-    if text == "Finalizar lista":
+        return await message.answer(
+            "✅ Compra finalizada. A lista fixa foi preservada para usos futuros.",
+            reply_markup=kb_menu(),
+        )
+
+    if texto == "Finalizar lista":
+        excluida = False
+
         if lista_id:
             try:
-                deleted = await database.deletar_lista(lista_id)
+                excluida = await database.deletar_lista(lista_id)
             except Exception:
-                deleted = False
-            if deleted:
-                await message.answer(f"✅ Lista *{lista_nome}* finalizada e removida.", parse_mode="Markdown", reply_markup=kb_menu())
-            else:
-                await message.answer("✅ Compra finalizada. Não foi possível remover a lista automaticamente.", reply_markup=kb_menu())
-        else:
-            await message.answer("Lista não encontrada para remoção.", reply_markup=kb_menu())
+                excluida = False
 
         await limpar_estado_preservando_departamento(state)
-        return
 
-    # opção inválida
-    return await message.answer("Opção inválida. Escolha 'Finalizar compra' ou 'Finalizar lista'.")
+        if excluida:
+            return await message.answer(
+                f"✅ A lista fixa *{lista_nome}* foi finalizada e removida.",
+                parse_mode="Markdown",
+                reply_markup=kb_menu(),
+            )
+
+        return await message.answer(
+            "✅ Compra finalizada, mas não foi possível remover a lista.",
+            reply_markup=kb_menu(),
+        )
+
+    await message.answer(
+        "Opção inválida. Escolha `Finalizar compra` ou `Finalizar lista`.",
+        reply_markup=kb_final_lista_fixa(),
+    )

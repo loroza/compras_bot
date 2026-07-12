@@ -1240,16 +1240,11 @@ async def global_voltar_menu_principal(message: types.Message, state: FSMContext
 
 # ─── CHAMA ROTERS EXTERNOS (listas) E START ────
 async def main():
-    # inclui router de listas (import dentro da função para evitar ciclos)
     from listas import router as listas_router
     dp.include_router(listas_router)
 
-    # tenta incluir router de orçamentos se o módulo existir
-    try:
-        from orcamentos import router as orc_router
-        dp.include_router(orc_router)
-    except Exception as e:
-        print(f"[WARN] não foi possível incluir orcamentos router: {e}")
+    from orcamentos import router as orc_router
+    dp.include_router(orc_router)
 
     print(f"[STARTUP] entering dp.start_polling PID={os.getpid()} ts={time.time()}")
     await dp.start_polling(bot)

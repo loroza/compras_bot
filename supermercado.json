@@ -469,8 +469,7 @@
           "leite zero lactose",
           "leite em po",
           "achocolatado liquido",
-          "bebida lactea",
-          "leite de coco culinario"
+          "bebida lactea"
         ]
       },
       "iogurtes_e_sobremesas_lacteas": {
@@ -946,7 +945,8 @@
           "cominho",
           "bicarbonato de sodio",
           "fermento quimico em po",
-          "fermento biologico seco"
+          "fermento biologico seco",
+          "coco ralado"
         ]
       },
       "conservas_e_enlatados": {

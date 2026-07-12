@@ -412,8 +412,12 @@ async def abrir_orcamentos_menu(message: types.Message, state: FSMContext):
 
 @router.message(OrcState.menu, F.text == "⬅️ Voltar")
 async def orc_voltar_menu(message: types.Message, state: FSMContext):
+    data = await state.get_data()
+    preserved = {k: data.get(k) for k in ("departamento_id", "departamento_nome", "departamento_emoji", "catalogo_json") if data.get(k)}
     await state.clear()
-    await message.answer("Voltando...", reply_markup=ReplyKeyboardRemove())
+    if preserved:
+        await state.set_data(preserved)
+    await message.answer("Menu principal:", reply_markup=ReplyKeyboardRemove())
 
 
 # ── Novo orçamento ──
@@ -1282,7 +1286,3 @@ async def orc_historico_detalhe_nav(message: types.Message, state: FSMContext):
         await state.clear()
         return await message.answer("Voltando ao menu principal.", reply_markup=ReplyKeyboardRemove())
     return await message.answer("Use os botões para navegar.")
-
-
-# exporta router
-router
