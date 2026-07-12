@@ -303,7 +303,8 @@ def build_orc_item_label(item_row):
             parts.append(sub)
         if nome:
             parts.append(nome)
-        label_main = " > ".join(parts) if parts else nome or ""
+        # label_main = " > ".join(parts) if parts else nome or ""
+        label_main = nome
         if unidade:
             label_main = f"{label_main} — {unidade}"
         label = f"{label_main} — R${float(valor):.2f}"
