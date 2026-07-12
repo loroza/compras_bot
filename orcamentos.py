@@ -423,17 +423,27 @@ async def orc_voltar_menu(message: types.Message, state: FSMContext):
 # ── Novo orçamento ──
 @router.message(OrcState.menu, F.text == "➕ Novo orçamento")
 async def orc_novo_inicio(message: types.Message, state: FSMContext):
-    await state.set_state(OrcState.novo_tipo_loja)
-    await message.answer("Selecione o tipo de loja:", reply_markup=kb_tipoloja())
+    # O orçamento começa pela lista e pelos itens. Os dados da loja são
+    # solicitados somente após a escolha do primeiro produto.
+    await state.update_data(
+        novo_itens=[],
+        novo_tipo_loja=None,
+        novo_nome_loja=None,
+        novo_descricao=None,
+        novo_link=None,
+    )
+    await orc_novo_listas_prompt(message, state)
 
 
 @router.message(OrcState.novo_tipo_loja)
 async def orc_novo_tipo_loja_handler(message: types.Message, state: FSMContext):
     if message.text == "⬅️ Voltar":
-        await state.set_state(OrcState.menu)
-        return await message.answer("📊 Menu de Orçamentos:", reply_markup=kb_orcamentos_menu())
+        await state.set_state(OrcState.novo_selecionar_lista)
+        return await orc_novo_listas_prompt(message, state)
+    if message.text not in ("🏬 Física", "🛒 E-commerce", "Física", "E-commerce"):
+        return await message.answer("Selecione uma opção usando o teclado.", reply_markup=kb_tipoloja())
     tipo = "Física" if message.text.startswith("🏬") or message.text == "Física" else "E-commerce"
-    await state.update_data(novo_tipo_loja=tipo, novo_itens=[])
+    await state.update_data(novo_tipo_loja=tipo)
     await state.set_state(OrcState.novo_nome_loja)
     await message.answer("Nome da loja do orçamento:", reply_markup=ReplyKeyboardRemove())
 
@@ -460,9 +470,12 @@ async def orc_novo_descricao_handler(message: types.Message, state: FSMContext):
     if tipo == "E-commerce":
         await state.set_state(OrcState.novo_link)
         return await message.answer("Informe o link do site da loja (ou digite '-' se não tiver):", reply_markup=kb_voltar())
-    else:
-        await state.set_state(OrcState.novo_selecionar_lista)
-        return await orc_novo_listas_prompt(message, state)
+
+    await state.set_state(OrcState.novo_qtd)
+    return await message.answer(
+        "Quantidade para o produto selecionado (ex.: 1, 1.5, 2):",
+        reply_markup=ReplyKeyboardRemove(),
+    )
 
 
 @router.message(OrcState.novo_link)
@@ -472,8 +485,11 @@ async def orc_novo_link_handler(message: types.Message, state: FSMContext):
         return await message.answer("Descrição do orçamento (pode ser uma frase curta).", reply_markup=kb_voltar())
     link = message.text.strip()
     await state.update_data(novo_link=link)
-    await state.set_state(OrcState.novo_selecionar_lista)
-    await orc_novo_listas_prompt(message, state)
+    await state.set_state(OrcState.novo_qtd)
+    await message.answer(
+        "Quantidade para o produto selecionado (ex.: 1, 1.5, 2):",
+        reply_markup=ReplyKeyboardRemove(),
+    )
 
 
 async def orc_novo_listas_prompt(message: types.Message, state: FSMContext):
@@ -499,8 +515,8 @@ async def orc_novo_listas_prompt(message: types.Message, state: FSMContext):
 @router.message(OrcState.novo_selecionar_lista)
 async def orc_novo_selecionar_lista_handler(message: types.Message, state: FSMContext):
     if message.text == "⬅️ Voltar":
-        await state.set_state(OrcState.novo_descricao)
-        return await message.answer("Descrição do orçamento (pode ser uma frase curta).", reply_markup=kb_voltar())
+        await state.set_state(OrcState.menu)
+        return await message.answer("📊 Menu de Orçamentos:", reply_markup=kb_orcamentos_menu())
 
     data = await state.get_data()
     map_listas = data.get("novo_listas_objs", {})
