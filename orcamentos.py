@@ -119,61 +119,6 @@ def as_item_dict(item):
     return {"item_nome": str(item)}
 
 
-
-def classificar_item_pelo_catalogo(item):
-    """Classifica o item com a mesma árvore usada no fluxo de compra das listas."""
-    registro = as_item_dict(item)
-    nome = (registro.get("item_nome") or registro.get("nome") or "").strip()
-    alvo = normalize_label(nome)
-
-    def procurar(no, caminho):
-        if isinstance(no, dict):
-            produtos = no.get("produtos")
-            if isinstance(produtos, list):
-                for produto in produtos:
-                    if normalize_label(produto) == alvo:
-                        return caminho
-            for chave, filho in no.items():
-                if chave in ("produtos", "subcategorias", "grupos"):
-                    continue
-                if isinstance(filho, (dict, list)):
-                    encontrado = procurar(filho, caminho + [chave])
-                    if encontrado:
-                        return encontrado
-            for container in ("subcategorias", "grupos"):
-                filhos = no.get(container)
-                if isinstance(filhos, dict):
-                    for chave, filho in filhos.items():
-                        encontrado = procurar(filho, caminho + [chave])
-                        if encontrado:
-                            return encontrado
-        elif isinstance(no, list):
-            for produto in no:
-                if normalize_label(produto) == alvo:
-                    return caminho
-        return None
-
-    caminho = procurar(catalogo.CATALOGO, [])
-    if caminho:
-        return {
-            "item_nome": nome,
-            "categoria": caminho[0],
-            "subcategoria": " > ".join(caminho[1:]) or None,
-            "id": registro.get("produto_id") or registro.get("id"),
-        }
-    return parse_item_label(registro)
-
-
-def carregar_itens_lista_classificados(lista_id):
-    """Retorna itens da lista já classificados pela árvore atual do catálogo."""
-    return database.pegar_itens_da_lista(lista_id)
-
-
-async def obter_itens_lista_classificados(lista_id):
-    itens = await carregar_itens_lista_classificados(lista_id)
-    return [classificar_item_pelo_catalogo({"item_nome": nome}) for nome in itens]
-
-
 def parse_item_label(raw):
     """
     Converte um item vindo da lista para um dicionário padronizado.
@@ -250,37 +195,10 @@ def parse_item_label(raw):
 
 
 def build_product_label(prod):
-    """
-    Gera label hierárquico para produtos:
-    Categoria > Subcategoria > Produto — Unidade — R$X.XX
-
-    Esta versão usa parse_item_label para ser tolerante a strings vindas do DB.
-    """
-    prod = parse_item_label(prod) if not isinstance(prod, dict) or "categoria" not in prod else parse_item_label(prod)
-    nome = prod.get("item_nome") or prod.get("nome") or ""
-    categoria = prod.get("categoria") or ""
-    sub = prod.get("subcategoria") or ""
-    unidade = prod.get("unidade") or prod.get("un") or ""
-    valor = prod.get("valor_unitario")
-    valor_num = 0.0
-    try:
-        if valor is not None:
-            valor_num = float(valor)
-    except Exception:
-        valor_num = 0.0
-
-    parts = []
-    if categoria:
-        parts.append(categoria)
-    if sub:
-        parts.append(sub)
-    if nome:
-        parts.append(nome)
-    label = " > ".join(parts) if parts else nome or str(prod)
-    if unidade:
-        label = f"{label} — {unidade}"
-    label = f"{label} — R${valor_num:.2f}"
-    return label
+    """Exibe o nome do produto com a mesma formatação do módulo de compras."""
+    produto = parse_item_label(prod)
+    nome = produto.get("item_nome") or ""
+    return catalogo.formatar(nome)
 
 
 def build_orc_item_label(item_row):
@@ -303,8 +221,7 @@ def build_orc_item_label(item_row):
             parts.append(sub)
         if nome:
             parts.append(nome)
-        # label_main = " > ".join(parts) if parts else nome or ""
-        label_main = nome
+        label_main = " > ".join(parts) if parts else nome or ""
         if unidade:
             label_main = f"{label_main} — {unidade}"
         label = f"{label_main} — R${float(valor):.2f}"
@@ -480,8 +397,12 @@ async def orc_voltar_menu(message: types.Message, state: FSMContext):
 # ── Novo orçamento ──
 @router.message(OrcState.menu, F.text == "➕ Novo orçamento")
 async def orc_novo_inicio(message: types.Message, state: FSMContext):
-    await state.set_state(OrcState.novo_tipo_loja)
-    await message.answer("Selecione o tipo de loja:", reply_markup=kb_tipoloja())
+    # Fluxo ideal: 4 Lista → 5 Categoria/Subcategoria → 6 Produto → 7 Qtd/Valor → 1/2/3 Loja.
+    await state.update_data(
+        novo_itens=[], novo_tipo_loja=None, novo_nome_loja=None,
+        novo_descricao=None, novo_link=None, novo_lista_id=None
+    )
+    await orc_novo_listas_prompt(message, state)
 
 
 @router.message(OrcState.novo_tipo_loja)
@@ -518,8 +439,8 @@ async def orc_novo_descricao_handler(message: types.Message, state: FSMContext):
         await state.set_state(OrcState.novo_link)
         return await message.answer("Informe o link do site da loja (ou digite '-' se não tiver):", reply_markup=kb_voltar())
     else:
-        await state.set_state(OrcState.novo_selecionar_lista)
-        return await orc_novo_listas_prompt(message, state)
+        await state.set_state(OrcState.novo_confirmar)
+        return await message.answer("Dados da loja salvos.", reply_markup=kb_confirmar_cancelar())
 
 
 @router.message(OrcState.novo_link)
@@ -556,8 +477,8 @@ async def orc_novo_listas_prompt(message: types.Message, state: FSMContext):
 @router.message(OrcState.novo_selecionar_lista)
 async def orc_novo_selecionar_lista_handler(message: types.Message, state: FSMContext):
     if message.text == "⬅️ Voltar":
-        await state.set_state(OrcState.novo_descricao)
-        return await message.answer("Descrição do orçamento (pode ser uma frase curta).", reply_markup=kb_voltar())
+        await state.set_state(OrcState.menu)
+        return await message.answer("📊 Menu de Orçamentos:", reply_markup=kb_orcamentos_menu())
 
     data = await state.get_data()
     map_listas = data.get("novo_listas_objs", {})
@@ -566,7 +487,7 @@ async def orc_novo_selecionar_lista_handler(message: types.Message, state: FSMCo
     if not lista_id:
         return await message.answer("Selecione uma lista válida.")
     await state.update_data(novo_lista_id=lista_id, novo_lista_nome=lista_nome)
-    itens = await obter_itens_lista_classificados(lista_id)
+    itens = await database.pegar_itens_da_lista_com_categoria(lista_id)
     if not itens:
         return await message.answer("A lista selecionada não contém itens. Use outra lista ou adicione itens.", reply_markup=kb_voltar())
 
@@ -697,9 +618,9 @@ async def orc_novo_produto_handler(message: types.Message, state: FSMContext):
                 idnum = int(chave.split(":")[1].strip())
                 for lbl, pk in prod_map.items():
                     if isinstance(pk, int) and pk == idnum:
-                        produto_key = pk
-                        chave = lbl
-                        break
+                    produto_key = pk
+                    chave = lbl
+                    break
             except Exception:
                 pass
 
@@ -734,10 +655,19 @@ async def orc_novo_valor_handler(message: types.Message, state: FSMContext):
     lista_itens = data.get("novo_itens", [])
     lista_itens.append({"item_nome": produto_label, "quantidade": data.get("novo_qtd", 1), "valor_unitario": valor})
     await state.update_data(novo_itens=lista_itens)
-    await state.set_state(OrcState.novo_confirmar)
     texto = "Item adicionado:\n"
     texto += f"• {produto_label} — {data.get('novo_qtd', 1)} x R${valor:.2f}\n\n"
     texto += f"Itens até agora: {len(lista_itens)}\n"
+
+    # Após o primeiro item, só então coleta os dados da loja: passos 1, 2 e 3.
+    if len(lista_itens) == 1 and not data.get("novo_tipo_loja"):
+        await state.set_state(OrcState.novo_tipo_loja)
+        return await message.answer(
+            texto + "Agora informe os dados da loja.\n\nSelecione o tipo de loja:",
+            reply_markup=kb_tipoloja(),
+        )
+
+    await state.set_state(OrcState.novo_confirmar)
     await message.answer(texto, reply_markup=kb_confirmar_cancelar())
 
 
